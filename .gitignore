@@ -1,0 +1,6 @@
+tinl
+test_unit
+bin/
+*.o
+*.dSYM/
+fuzz/out/

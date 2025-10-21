@@ -1,0 +1,2 @@
+# RUN: ./tinl -q -c tinl.conf test/robust/failing.c || echo FAIL
+# CHECK: FAIL

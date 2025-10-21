@@ -1,0 +1,6 @@
+style=kr
+indent=tabs
+#indent-switches
+pad-oper
+pad-comma
+max-code-length=80

@@ -1,0 +1,114 @@
+.\" tinl manual
+.TH TINL 1 "October 2025" "tinl"
+.SH NAME
+tinl \- tiny lit-inspired tester
+.SH SYNOPSIS
+.B tinl
+[\-v |\-q] [\-c
+.I file
+] [\-D
+.I feature
+] ... [\-t
+.I seconds
+] [\-T
+.I dir
+] [\-b
+.I dir
+] \fItest-file\fR ...
+.SH DESCRIPTION
+.B tinl
+("tinl is not lit") is a compact regression-test driver inspired by LLVM's lit.
+It understands the familiar \fB// RUN:\fR style annotations found in many
+compiler
+projects but keeps the implementation intentionally small and mostly vibe-coded.
+Each input file is scanned for directive comments that describe which shell
+commands to execute and which feature gates should apply before running them.
+.PP
+By default the tool prints a compact status line for every test:
+\fB[ RUN ]\fR when starting, optionally \fB[ SKIP ]\fR when a feature gate
+excludes the test, \fB[FAIL]\fR when a command exits non-zero, \fB[TIME]\fR on a
+timeout, and \fB[  OK ]\fR when a test succeeds.
+.SH OPTIONS
+.TP
+.B \-v
+Show each shell command before it runs.
+.TP
+.B \-q
+Quiet mode; only display failures and summary status.
+.TP
+.BI \-c " file"
+Read additional substitution keys from \fIfile\fR. Each line should be
+\fIkey\fR = \fIvalue\fR and makes \fB%key\fR available inside directives.
+.TP
+.BI \-D " feature"
+Enable a feature so directives guarded by \fBREQUIRES:\fR or \fBUNSUPPORTED:\fR
+can include or skip the current test.
+.TP
+.BI \-t " seconds"
+Kill individual \fBRUN:\fR commands that exceed the given wall-clock limit.
+The wrapper exits with status 124 when a timeout occurs.
+.TP
+.BI \-T " dir"
+Use \fIdir\fR as the root for scratch files associated with the \fB%t\fR and
+\fB%T\fR placeholders. Defaults to \fI/tmp\fR.
+.TP
+.BI \-b " dir"
+Store paths produced for the \fB%b\fR/\fB%B\fR placeholders under \fIdir\fR
+instead
+of the default \fIbin\fR tree.
+.SH CONFIGURATION
+The default configuration maps \fB%check\fR to \fBtinl-check %s\fR, assuming
+\fBtinl-check\fR is available on \fBPATH\fR. Additional placeholders come from
+files supplied with \fB-c\fR, using simple \fIkey\fR = \fIvalue\fR lines. For
+example:
+.PP
+.nf
+    cc = cc -O2 -g
+    linker = cc -Wl,-rpath=%T -o %b %s
+.fi
+.PP
+This makes \fB%cc\fR and \fB%linker\fR available inside \fBRUN:\fR directives.
+.SH DIRECTIVES
+tinl recognises the following case-sensitive directives inside line comments:
+.TP
+\fBRUN:\fR command
+Collects the shell \fIcommand\fR to execute for the current test.
+.TP
+\fBREQUIRES:\fR feature[, feature...]
+Skips the test unless every listed feature is supplied with \fB-D\fR.
+.TP
+\fBUNSUPPORTED:\fR feature[, feature...]
+Skips the test when any listed feature is enabled.
+.SH PLACEHOLDERS
+Substitutions available inside \fBRUN:\fR commands:
+.TP
+\fB%s\fR
+Current test file path.
+.TP
+\fB%S\fR
+Directory containing the current test.
+.TP
+\fB%t\fR
+Per-command scratch file (unique for the run).
+.TP
+\fB%T\fR
+Scratch directory matching \fB%t\fR.
+.TP
+\fB%b\fR
+Path that mirrors the source layout under the directory supplied with
+\fB-b\fR (defaults to \fBbin\fR).
+.TP
+\fB%B\fR
+Directory component of \fB%b\fR.
+.PP
+User-defined placeholders come from the configuration file supplied with
+\fB-c\fR. For example, \fBcc = cc -O2 -g\fR makes \fB%cc\fR available. The
+\fB%check\fR placeholder resolves to \fBtinl-check %s\fR by default and can be
+overridden the same way.
+.SH EXIT STATUS
+Zero on success, non-zero on failure. A timed-out command returns exit status
+124.
+.SH SEE ALSO
+LLVM lit documentation:
+.UR https://llvm.org/docs/CommandGuide/lit.html
+.UE

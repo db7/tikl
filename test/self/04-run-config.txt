@@ -1,0 +1,2 @@
+# RUN: echo "%cc %s" | sed "s/%s/test\/basic.c/" | sh -c "cat" | grep -F "cc -O2 -g"
+# CHECK: cc -O2 -g

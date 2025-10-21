@@ -1,0 +1,4 @@
+# RUN: echo first \ 
+    and second \ 
+    and third
+# CHECK: first and second and third
