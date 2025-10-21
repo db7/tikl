@@ -1,5 +1,5 @@
 .\" tinl manual
-.TH TINL 1 "October 2025" "tinl"
+.TH TINL 1 "October 2025" "tinl 0.1.0"
 .SH NAME
 tinl \- tiny lit-inspired tester
 .SH SYNOPSIS
@@ -54,8 +54,10 @@ Use \fIdir\fR as the root for scratch files associated with the \fB%t\fR and
 .TP
 .BI \-b " dir"
 Store paths produced for the \fB%b\fR/\fB%B\fR placeholders under \fIdir\fR
-instead
-of the default \fIbin\fR tree.
+instead of the default \fIbin\fR tree.
+.TP
+.B \-V
+Print the tinl version and exit.
 .SH CONFIGURATION
 The default configuration maps \fB%check\fR to \fBtinl-check %s\fR, assuming
 \fBtinl-check\fR is available on \fBPATH\fR. Additional placeholders come from

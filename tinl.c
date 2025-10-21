@@ -36,6 +36,7 @@ static const char *bin_root = "bin";
 static const char *const default_scratch_root = "/tmp";
 static const char *scratch_root = "/tmp";
 static unsigned timeout_secs = 0;
+static const char tinl_version[] = "0.1.0";
 
 static void die(const char *fmt, ...)
 {
@@ -538,14 +539,16 @@ static int run_test_file(const char *path, mapkv *cfgsubs, vecstr *features, boo
 static void usage(const char *arg0)
 {
     fprintf(stderr,
-            "Usage: %s [-v|-q] [-c config] [-D feature]... [-t seconds] [-T scratch] [-b binroot] FILE...\n"
+            "Usage: %s [-v|-q] [-c config] [-D feature]... [-t seconds] "
+            "[-T scratch] [-b binroot] FILE...\n"
             "  -v           verbose shell commands\n"
             "  -q           quiet (only pass/fail)\n"
             "  -c FILE      substitution config (lines: key = value)\n"
             "  -D feature   enable feature for REQUIRES/UNSUPPORTED\n"
             "  -t SECONDS   timeout for each RUN command (0 disables)\n"
             "  -T DIR       scratch directory root for %%t/%%T (default /tmp)\n"
-            "  -b DIR       base directory used when expanding %%b/%%B (default bin)\n", arg0);
+            "  -b DIR       base directory used when expanding %%b/%%B (default bin)\n"
+            "  -V           print tinl version and exit\n", arg0);
 }
 
 int main(int argc, char **argv)
@@ -555,7 +558,7 @@ int main(int argc, char **argv)
     vecstr features = {0};
 
     int opt;
-    while((opt = getopt(argc, argv, "vqc:D:t:T:b:")) != -1) {
+    while((opt = getopt(argc, argv, "vqc:D:t:T:b:V")) != -1) {
         switch(opt) {
         case 'v':
             verbose = true;
@@ -584,6 +587,10 @@ int main(int argc, char **argv)
         case 'b':
             bin_root = (optarg && *optarg) ? optarg : default_bin_root;
             break;
+        case 'V':
+            printf("tinl %s\n", tinl_version);
+            vecstr_free(&features);
+            return 0;
         default:
             usage(argv[0]);
             return 2;

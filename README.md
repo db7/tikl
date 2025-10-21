@@ -78,6 +78,7 @@ need `%b` to land somewhere other than `bin/`.
 - `-b DIR` — change the root directory used for `%b`/`%B` (defaults to `bin`).
 - `-t SECONDS` — terminate any `RUN` command that exceeds the given wall-clock
   budget (returns exit code 124).
+- `-V` — print the tinl version and exit.
 
 ## Inspirations
 
