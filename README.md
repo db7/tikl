@@ -86,6 +86,8 @@ cases:
 - `CHECK-SAME:` keeps matching on the current line.
 - `CHECK-EMPTY:` expects the next line to be blank.
 - `CHECK-COUNT: N foo` requires `foo` to be seen exactly `N` times.
+- Embed regular expressions inline with `{{...}}`; literal text around the block
+  is matched verbatim, so `CHECK: value={{[0-9]+}}` accepts `value=123`.
 
 Need a different tag? Append options after `%check`, e.g. `| %check --check-prefix=ALT`,
 so only `ALT:` directives are honoured. Use multiple `--check-prefix` flags to match

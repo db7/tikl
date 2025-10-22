@@ -29,6 +29,44 @@ trim_leading() {
 	printf "%s" "$1" | sed 's/^[[:space:]]*//'
 }
 
+escape_literal() {
+	printf "%s" "$1" | sed 's/[].[^$\\*/+?{}()|]/\\&/g'
+}
+
+make_regex() {
+	input=$1
+	regex=""
+	rest=$input
+	while [ -n "$rest" ]; do
+		case "$rest" in
+			*'{{'*)
+				lit=${rest%%'{{'*}
+				if [ -n "$lit" ]; then
+					regex="${regex}$(escape_literal "$lit")"
+				fi
+				rest=${rest#*'{{'}
+				case "$rest" in
+					*'}}'*)
+						block=${rest%%'}}'*}
+						regex="${regex}${block}"
+						rest=${rest#*'}}'}
+						;;
+					*)
+						echo "tinl-check: unterminated {{ in pattern: $input" >&2
+						return 1
+						;;
+				esac
+				;;
+			*)
+				regex="${regex}$(escape_literal "$rest")"
+				rest=""
+				;;
+		esac
+	done
+	printf "%s" "$regex"
+	return 0
+}
+
 get_last_line() {
 	tag=$(sanitize_prefix "$1")
 	var="last_line_${tag}"
@@ -124,9 +162,13 @@ status=0
 check_forward() {
 	prefix=$1
 	pat=$2
+	regex=$(make_regex "$pat") || {
+		status=1
+		return
+	}
 	last=$(get_last_line "$prefix")
-	line=$(awk -v start="$last" -v pat="$pat" '
-		NR > start && index($0, pat) { print NR; found=1; exit }
+	line=$(awk -v start="$last" -v regex="$regex" '
+		NR > start && $0 ~ regex { print NR; found=1; exit }
 		END { if(!found) exit 1 }
 	' "$tmp")
 	if [ $? -ne 0 ] || [ -z "$line" ]; then
@@ -141,6 +183,10 @@ check_forward() {
 check_next() {
 	prefix=$1
 	pat=$2
+	regex=$(make_regex "$pat") || {
+		status=1
+		return
+	}
 	have=$(get_have_last "$prefix")
 	if [ "$have" -eq 0 ]; then
 		echo "tinl-check: ${prefix}-NEXT without prior match" >&2
@@ -149,8 +195,8 @@ check_next() {
 	fi
 	last=$(get_last_line "$prefix")
 	exp=$((last + 1))
-	line=$(awk -v expected="$exp" -v pat="$pat" '
-		NR == expected && index($0, pat) { print NR; found=1; exit }
+	line=$(awk -v expected="$exp" -v regex="$regex" '
+		NR == expected && $0 ~ regex { print NR; found=1; exit }
 		END { if(!found) exit 1 }
 	' "$tmp")
 	if [ $? -ne 0 ] || [ -z "$line" ]; then
@@ -165,6 +211,10 @@ check_next() {
 check_same() {
 	prefix=$1
 	pat=$2
+	regex=$(make_regex "$pat") || {
+		status=1
+		return
+	}
 	have=$(get_have_last "$prefix")
 	if [ "$have" -eq 0 ]; then
 		echo "tinl-check: ${prefix}-SAME without prior match" >&2
@@ -172,8 +222,8 @@ check_same() {
 		return
 	fi
 	target=$(get_last_line "$prefix")
-	line=$(awk -v target="$target" -v pat="$pat" '
-		NR == target && index($0, pat) { print NR; found=1; exit }
+	line=$(awk -v target="$target" -v regex="$regex" '
+		NR == target && $0 ~ regex { print NR; found=1; exit }
 		END { if(!found) exit 1 }
 	' "$tmp")
 	if [ $? -ne 0 ] || [ -z "$line" ]; then
@@ -208,8 +258,12 @@ check_empty() {
 check_count() {
 	target_count=$1
 	pat=$2
-	found=$(awk -v pat="$pat" '
-		index($0, pat) { count++ }
+	regex=$(make_regex "$pat") || {
+		status=1
+		return
+	}
+	found=$(awk -v regex="$regex" '
+		$0 ~ regex { count++ }
 		END { print count + 0 }
 	' "$tmp")
 	if [ "$found" != "$target_count" ]; then
@@ -220,8 +274,12 @@ check_count() {
 
 check_not() {
 	pat=$1
-	if awk -v pat="$pat" '
-		index($0, pat) { found=1; exit }
+	regex=$(make_regex "$pat") || {
+		status=1
+		return
+	}
+	if awk -v regex="$regex" '
+		$0 ~ regex { found=1; exit }
 		END { if(found) exit 0; exit 1 }
 	' "$tmp"; then
 		echo "tinl-check: unexpected pattern: $pat" >&2

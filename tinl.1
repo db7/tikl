@@ -124,6 +124,8 @@ line, \fBCHECK-EMPTY:\fR demands a blank line, \fBCHECK-NOT:\fR forbids the
 fragment anywhere, and \fBCHECK-COUNT:\fR enforces an exact occurrence count.
 Passing \fB--check-prefix=ALT\fR (repeatable) after \fB%check\fR switches the
 accepted prefixes to \fBALT\fR, \fBALT-NEXT\fR, and so on.
+Regex fragments can be embedded inline with \fB{{...}}\fR; surrounding text is
+still matched literally.
 .SH EXAMPLES
 .PP
 The snippet below builds a small helper, runs it, and checks the produced
