@@ -8,7 +8,7 @@ CFLAGS_+=	-Wall -Wextra -Wpedantic -Wshadow -Werror
 
 PREFIX?=	/usr/local
 BINDIR?=	${PREFIX}/bin
-MANDIR?=	${PREFIX}/share/man/man1
+MANDIR?=	${PREFIX}/man/man1
 INSTALL?=	install
 MKDIR_P?=	mkdir -p
 TARGET=		tikl

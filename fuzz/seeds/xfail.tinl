@@ -1,0 +1,2 @@
+# XFAIL: example xfail
+# RUN: false

@@ -393,6 +393,12 @@ static char *perform_substitutions(const char *cmd_in, mapkv *subs,
 
 static int run_shell(const char *cmd, bool verbose, bool *timed_out)
 {
+#ifdef TIKL_FUZZ
+	(void)cmd;
+	(void)verbose;
+	if(timed_out) *timed_out = false;
+	return 0;
+#else
 	if(timed_out) *timed_out = false;
 	if(verbose) {
 		fputs("    $ ", stderr);
@@ -442,6 +448,7 @@ static int run_shell(const char *cmd, bool verbose, bool *timed_out)
 	if(WIFEXITED(st)) return WEXITSTATUS(st);
 	if(WIFSIGNALED(st)) return 128 + WTERMSIG(st);
 	return 127;
+#endif
 }
 
 static bool parse_comment_run(const char *line, char *out, size_t cap)

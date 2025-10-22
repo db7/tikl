@@ -1,0 +1,3 @@
+# RUN: echo one | %check
+# CHECK: one
+# CHECK-NOT: two

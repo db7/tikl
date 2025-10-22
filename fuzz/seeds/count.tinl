@@ -1,0 +1,2 @@
+# RUN: printf 'dup\ndup\n' | %check
+# CHECK-COUNT: 2 dup
