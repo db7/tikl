@@ -36,7 +36,7 @@ static const char *bin_root = "bin";
 static const char *const default_scratch_root = "/tmp";
 static const char *scratch_root = "/tmp";
 static unsigned timeout_secs = 0;
-static const char tinl_version[] = "0.1.0";
+static const char tinl_version[] = "0.1.1";
 
 static void die(const char *fmt, ...)
 {
@@ -47,6 +47,31 @@ static void die(const char *fmt, ...)
     va_end(ap);
     exit(2);
 }
+
+static void ensure_dir(const char *path)
+{
+    if(!path || *path == '\0') return;
+    if(path[0] == '.' && path[1] == '\0') return;
+    char buf[PATH_MAX];
+    if(snprintf(buf, sizeof buf, "%s", path) >= (int)sizeof buf) {
+        die("path too long: %s", path);
+    }
+    char *p = buf;
+    if(*p == '/') p++;
+    for(; *p; p++) {
+        if(*p == '/') {
+            *p = '\0';
+            if(buf[0] != '\0' && mkdir(buf, 0755) != 0 && errno != EEXIST) {
+                die("mkdir %s: %s", buf, strerror(errno));
+            }
+            *p = '/';
+        }
+    }
+    if(mkdir(buf, 0755) != 0 && errno != EEXIST) {
+        die("mkdir %s: %s", buf, strerror(errno));
+    }
+}
+
 static void *xrealloc(void *p, size_t z) {
     void *q = realloc(p, z);
     if(!q) die("OOM");
@@ -272,6 +297,7 @@ static char *perform_substitutions(const char *cmd_in, mapkv *subs, const char *
     map_source_to_bin(testpath, bmap, sizeof bmap);
     char bdir[PATH_MAX];
     path_dirname(bmap, bdir, sizeof bdir);
+    ensure_dir(bdir);
 
     char *tdir = make_temp_dir();
 

@@ -3,8 +3,7 @@
 tinl ("tinl is not lit") is a deliberately small test driver inspired by [LLVM's
 lit](https://llvm.org/docs/CommandGuide/lit.html). It keeps the familiar `//
 RUN:` style annotations but trims the feature set down so it stays portable and
-easy to hack on. The original version of this program was mostly vibe-coded, yet
-it has proven handy for exercising small compiler or tooling projects.
+easy to hack on.
 
 ## Highlights
 
@@ -32,7 +31,7 @@ make
 This produces the `tinl` binary in the project root. A unit test and integration
 smoke tests are available via `make test`.
 
-To install into a prefix (pkgsrc-style), run:
+To install into a prefix, run:
 
 ```sh
 make install PREFIX=/usr/pkg DESTDIR=/path/to/staging
@@ -45,7 +44,7 @@ use.
 ## Quick start
 
 ```sh
-./tinl -q -c tinl.conf test/basic.c
+./tinl -c tinl.conf test/basic.c
 ```
 
 The example above runs a single test under `test/`, relying on the built-in
@@ -53,8 +52,33 @@ The example above runs a single test under `test/`, relying on the built-in
 `tinl-check`. After `tinl` and `tinl-check` are installed on your `PATH`, you no
 longer need `-c tinl.conf`. For suites, point tinl at multiple files (or
 glob via your shell) and it will execute each test in sequence, reporting
-`[ RUN ]`, `[ SKIP ]`, `[FAIL]`, and `[  OK ]` statuses. When you need extra
-placeholders (such as `%cc`), pass `-c tinl.conf` or your own config file.
+`[ RUN ]`, `[ SKIP ]`, `[FAIL]`, and `[  OK ]` statuses. Use `-q` for concise
+output or `-v` to echo the shell commands as they run.
+
+### `%check` in action
+
+A typical test pairs a `RUN:` directive with `%check` so the helper script can
+verify a file’s contents:
+
+```c
+// RUN: %cc %s -o %b
+// RUN: %b | %check
+// CHECK: expected content
+
+#include <stdio.h>
+
+int main(void) {
+    printf("expected content\n");
+    return 0;
+}
+```
+
+With the default `tinl.conf` in this repository, `%check` expands to
+`tinl-check %s`, which reads `CHECK:` lines in the test file and ensures every
+pattern appears in the piped output. You don't have to pass `%s` explicitly—tinl
+fills it in during substitution. Add more `CHECK:` lines if you need to verify
+multiple fragments, or override `%check` via your own config when your project
+needs different tooling.
 
 ## Configuration cheat sheet
 
@@ -80,9 +104,11 @@ need `%b` to land somewhere other than `bin/`.
   budget (returns exit code 124).
 - `-V` — print the tinl version and exit.
 
-## Inspirations
+## Disclaimers
 
 tinl borrows the broad idea—and a few naming conventions—from LLVM's lit, but
 intentionally keeps to a smaller scope so it can stay approachable. If you need
 the full-featured original, check out the [LLVM lit
 documentation](https://llvm.org/docs/CommandGuide/lit.html).
+
+Note that the original version of this program was mostly vibe-coded.

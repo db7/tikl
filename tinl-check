@@ -1,10 +1,17 @@
 #!/bin/sh
 testfile="$1"
 output=$(cat)
-awk '/CHECK:/{sub(/.*CHECK:[[:space:]]*/, "", $0); print}' "$testfile" | while IFS= read -r expected; do
-	printf "%s" "$output" | grep -F -- "$expected" >/dev/null 2>&1 || {
-		echo "tinl-check: missing pattern: $expected" >&2
-		exit 1
-	}
-done
-exit 0
+status=0
+while IFS= read -r line; do
+	case "$line" in
+		*CHECK:*)
+			expected=${line#*CHECK:}
+			expected=$(printf "%s" "$expected" | sed 's/^[[:space:]]*//')
+			printf "%s" "$output" | grep -F -- "$expected" >/dev/null 2>&1 || {
+				echo "tinl-check: missing pattern: $expected" >&2
+				status=1
+			}
+			;;
+	esac
+done < "$testfile"
+exit $status

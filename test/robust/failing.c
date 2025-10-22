@@ -1,2 +1,5 @@
-// RUN: false
-int main(void){return 0;}
+// RUN: %cc %s -o %b
+// RUN: ! %b
+int main(void){
+    return 1;
+}

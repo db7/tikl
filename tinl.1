@@ -1,5 +1,5 @@
 .\" tinl manual
-.TH TINL 1 "October 2025" "tinl 0.1.0"
+.TH TINL 1 "October 2025" "tinl 0.1"
 .SH NAME
 tinl \- tiny lit-inspired tester
 .SH SYNOPSIS
@@ -107,6 +107,41 @@ User-defined placeholders come from the configuration file supplied with
 \fB-c\fR. For example, \fBcc = cc -O2 -g\fR makes \fB%cc\fR available. The
 \fB%check\fR placeholder resolves to \fBtinl-check %s\fR by default and can be
 overridden the same way.
+.SH EXAMPLES
+.PP
+The snippet below builds a small helper, runs it, and checks the produced
+output with the default \fB%check\fR expansion:
+.PP
+.nf
+    // RUN: %cc %s -o %b
+    // RUN: %b | %check
+    // CHECK: expected content
+
+    #include <stdio.h>
+
+    int main(void) {
+        printf("expected content\\n");
+        return 0;
+    }
+.fi
+.PP
+Tests can also assert that a binary fails while still validating its diagnostic
+stream. Wrapping the invocation in \fB(! ...)\fR flips the exit code so the
+overall command succeeds when the program aborts:
+.PP
+.nf
+    // RUN: %cc %s -o %b
+    // RUN: (! %b) 2>&1 | %check
+    // CHECK: boom assertion triggered
+
+    #include <stdio.h>
+    #include <stdlib.h>
+
+    int main(void) {
+        fprintf(stderr, "boom assertion triggered\\n");
+        abort();
+    }
+.fi
 .SH EXIT STATUS
 Zero on success, non-zero on failure. A timed-out command returns exit status
 124.

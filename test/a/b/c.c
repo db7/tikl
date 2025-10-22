@@ -1,4 +1,3 @@
-// RUN: mkdir -p %B
 // RUN: %cc %s -o %b
 // RUN: %b
 #include <stdio.h>
