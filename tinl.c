@@ -180,11 +180,16 @@ static void map_source_to_bin(const char *src, char *out, size_t cap)
     const char *root = (bin_root && *bin_root) ? bin_root : default_bin_root;
     size_t nroot = strlen(root);
     bool need_slash = nroot && root[nroot - 1] != '/';
-    if(need_slash) {
-        snprintf(out, cap, "%s/%s", root, rel);
-    } else {
-        snprintf(out, cap, "%s%s", root, rel);
+    size_t nrel = strlen(rel);
+    size_t needed = nroot + (need_slash ? 1 : 0) + nrel + 1;
+    if(cap == 0 || needed > cap) {
+        die("output path too long: %s", src);
     }
+    char *p = out;
+    memcpy(p, root, nroot);
+    p += nroot;
+    if(need_slash) *p++ = '/';
+    memcpy(p, rel, nrel + 1);
 }
 
 static void parse_config(const char *path, mapkv *subs)
