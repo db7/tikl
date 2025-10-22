@@ -3,7 +3,8 @@
 // CHECK: boom assertion triggered
 #include <stdio.h>
 #include <stdlib.h>
-int main(void){
-    fprintf(stderr, "boom assertion triggered\n");
-    abort();
+int main(void)
+{
+	fprintf(stderr, "boom assertion triggered\n");
+	abort();
 }
