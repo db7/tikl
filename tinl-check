@@ -4,6 +4,14 @@ output=$(cat)
 status=0
 while IFS= read -r line; do
 	case "$line" in
+		*CHECK-NOT:*)
+			disallowed=${line#*CHECK-NOT:}
+			disallowed=$(printf "%s" "$disallowed" | sed 's/^[[:space:]]*//')
+			if printf "%s" "$output" | grep -F -- "$disallowed" >/dev/null 2>&1; then
+				echo "tinl-check: unexpected pattern: $disallowed" >&2
+				status=1
+			fi
+			;;
 		*CHECK:*)
 			expected=${line#*CHECK:}
 			expected=$(printf "%s" "$expected" | sed 's/^[[:space:]]*//')

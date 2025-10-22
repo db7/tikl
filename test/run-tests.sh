@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 ./tinl -q -c tinl.conf test/basic.c
+./tinl -q -c tinl.conf test/check-not.c
 ./tinl -q -c tinl.conf test/multi-run.c
 ./tinl -q -c tinl.conf test/a/b/c.c
 ./tinl -q -c tinl.conf test/requires.c | grep -E "SKIP|skip|Skip" >/dev/null 2>&1 || true
@@ -8,6 +9,7 @@ set -eu
 ./tinl -q -c tinl.conf test/robust/failing.c
 ./tinl -q -c tinl.conf test/robust/assert-fail.c
 if ./tinl -q -c tinl.conf test/robust/check-mismatch.c ; then exit 1; fi
+if ./tinl -q -c tinl.conf test/robust/check-not-hit.c ; then exit 1; fi
 ./tinl -q test/robust/empty.txt
 ./tinl -q test/robust/long-continue.txt
 echo "integration: OK"

@@ -106,7 +106,8 @@ Directory component of \fB%b\fR.
 User-defined placeholders come from the configuration file supplied with
 \fB-c\fR. For example, \fBcc = cc -O2 -g\fR makes \fB%cc\fR available. The
 \fB%check\fR placeholder resolves to \fBtinl-check %s\fR by default and can be
-overridden the same way.
+overridden the same way. The helper recognises \fBCHECK:\fR lines to require a
+pattern and \fBCHECK-NOT:\fR to ensure a fragment is absent.
 .SH EXAMPLES
 .PP
 The snippet below builds a small helper, runs it, and checks the produced

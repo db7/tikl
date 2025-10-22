@@ -77,7 +77,9 @@ With the default `tinl.conf` in this repository, `%check` expands to
 `tinl-check %s`, which reads `CHECK:` lines in the test file and ensures every
 pattern appears in the piped output. You don't have to pass `%s` explicitly—tinl
 fills it in during substitution. Add more `CHECK:` lines if you need to verify
-multiple fragments, or override `%check` via your own config when your project
+multiple fragments. Use `CHECK-NOT:` when a fragment must be absent from the
+output; each such directive fails the test if its pattern is found. Override
+`%check` via your own config when your project
 needs different tooling.
 
 ## Configuration cheat sheet
