@@ -81,6 +81,16 @@ Skips the test unless every listed feature is supplied with \fB-D\fR.
 .TP
 \fBUNSUPPORTED:\fR feature[, feature...]
 Skips the test when any listed feature is enabled.
+.TP
+\fBALLOW_RETRIES:\fR count
+Retries each \fBRUN:\fR command up to \fIcount\fR additional times when it
+fails or times out. The allowance applies per step.
+.TP
+\fBXFAIL:\fR [reason]
+Marks the test as an expected failure. tinl reports \[lq]XFAIL\[rq] when a
+step fails (or times out) and treats the test as passed. If every step
+succeeds, the run is flagged as \[lq]XPASS\[rq] and fails overall. An optional
+\fIreason\fR after the colon is printed alongside the status.
 .SH PLACEHOLDERS
 Substitutions available inside \fBRUN:\fR commands:
 .TP
@@ -106,8 +116,14 @@ Directory component of \fB%b\fR.
 User-defined placeholders come from the configuration file supplied with
 \fB-c\fR. For example, \fBcc = cc -O2 -g\fR makes \fB%cc\fR available. The
 \fB%check\fR placeholder resolves to \fBtinl-check %s\fR by default and can be
-overridden the same way. The helper recognises \fBCHECK:\fR lines to require a
-pattern and \fBCHECK-NOT:\fR to ensure a fragment is absent.
+overridden the same way. The helper recognises \fBCHECK:\fR, \fBCHECK-NOT:\fR,
+\fBCHECK-NEXT:\fR, \fBCHECK-SAME:\fR, \fBCHECK-EMPTY:\fR, and \fBCHECK-COUNT:\fR
+directives. Plain \fBCHECK:\fR patterns must appear in order. \fBCHECK-NEXT:\fR
+advances to the following output line, \fBCHECK-SAME:\fR stays on the current
+line, \fBCHECK-EMPTY:\fR demands a blank line, \fBCHECK-NOT:\fR forbids the
+fragment anywhere, and \fBCHECK-COUNT:\fR enforces an exact occurrence count.
+Passing \fB--check-prefix=ALT\fR (repeatable) after \fB%check\fR switches the
+accepted prefixes to \fBALT\fR, \fBALT-NEXT\fR, and so on.
 .SH EXAMPLES
 .PP
 The snippet below builds a small helper, runs it, and checks the produced

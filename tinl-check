@@ -1,25 +1,279 @@
 #!/bin/sh
-testfile="$1"
-output=$(cat)
-status=0
-while IFS= read -r line; do
-	case "$line" in
-		*CHECK-NOT:*)
-			disallowed=${line#*CHECK-NOT:}
-			disallowed=$(printf "%s" "$disallowed" | sed 's/^[[:space:]]*//')
-			if printf "%s" "$output" | grep -F -- "$disallowed" >/dev/null 2>&1; then
-				echo "tinl-check: unexpected pattern: $disallowed" >&2
-				status=1
-			fi
-			;;
-		*CHECK:*)
-			expected=${line#*CHECK:}
-			expected=$(printf "%s" "$expected" | sed 's/^[[:space:]]*//')
-			printf "%s" "$output" | grep -F -- "$expected" >/dev/null 2>&1 || {
-				echo "tinl-check: missing pattern: $expected" >&2
-				status=1
-			}
+
+set -u
+
+sanitize_prefix() {
+	printf "%s" "$1" | tr -c 'A-Za-z0-9_' '_'
+}
+
+add_prefix() {
+	p=$1
+	if [ -z "$p" ]; then
+		echo "tinl-check: empty --check-prefix" >&2
+		exit 2
+	fi
+	case "$p" in
+		*[!A-Za-z0-9_-]*)
+			echo "tinl-check: invalid prefix: $p" >&2
+			exit 2
 			;;
 	esac
+	if [ -z "${prefixes-}" ]; then
+		prefixes="$p"
+	else
+		prefixes="$prefixes $p"
+	fi
+}
+
+trim_leading() {
+	printf "%s" "$1" | sed 's/^[[:space:]]*//'
+}
+
+get_last_line() {
+	tag=$(sanitize_prefix "$1")
+	var="last_line_${tag}"
+	eval "printf '%s' \"\${$var:-0}\""
+}
+
+set_last_line() {
+	tag=$(sanitize_prefix "$1")
+	var="last_line_${tag}"
+	eval "$var=$2"
+}
+
+get_have_last() {
+	tag=$(sanitize_prefix "$1")
+	var="have_last_${tag}"
+	eval "printf '%s' \"\${$var:-0}\""
+}
+
+set_have_last() {
+	tag=$(sanitize_prefix "$1")
+	var="have_last_${tag}"
+	eval "$var=$2"
+}
+
+usage() {
+	echo "usage: tinl-check [--check-prefix=NAME]... TESTFILE" >&2
+	exit 2
+}
+
+prefixes=""
+testfile=""
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--check-prefix=*)
+			add_prefix "${1#*=}"
+			shift
+			;;
+		--check-prefix)
+			shift
+			[ $# -gt 0 ] || usage
+			add_prefix "$1"
+			shift
+			;;
+		--)
+			shift
+			break
+			;;
+		-*)
+			echo "tinl-check: unknown option: $1" >&2
+			exit 2
+			;;
+		*)
+			if [ -z "$testfile" ]; then
+				testfile="$1"
+			else
+				echo "tinl-check: unexpected argument: $1" >&2
+				exit 2
+			fi
+			shift
+			;;
+	esac
+done
+
+if [ -z "$testfile" ] && [ $# -gt 0 ]; then
+	testfile="$1"
+	shift
+fi
+
+if [ -z "$testfile" ]; then
+	usage
+fi
+
+if [ $# -gt 0 ]; then
+	echo "tinl-check: unexpected argument: $1" >&2
+	exit 2
+fi
+
+if [ -z "$prefixes" ]; then
+	prefixes="CHECK"
+fi
+
+tmp=$(mktemp "${TMPDIR:-/tmp}/tinl-check.XXXXXX" 2>/dev/null)
+if [ $? -ne 0 ] || [ -z "$tmp" ]; then
+	tmp="${TMPDIR:-/tmp}/tinl-check.$$"
+fi
+trap 'rm -f "$tmp"' EXIT HUP INT TERM
+
+cat >"$tmp"
+
+status=0
+
+check_forward() {
+	prefix=$1
+	pat=$2
+	last=$(get_last_line "$prefix")
+	line=$(awk -v start="$last" -v pat="$pat" '
+		NR > start && index($0, pat) { print NR; found=1; exit }
+		END { if(!found) exit 1 }
+	' "$tmp")
+	if [ $? -ne 0 ] || [ -z "$line" ]; then
+		echo "tinl-check: missing pattern: $pat" >&2
+		status=1
+		return
+	fi
+	set_last_line "$prefix" "$line"
+	set_have_last "$prefix" 1
+}
+
+check_next() {
+	prefix=$1
+	pat=$2
+	have=$(get_have_last "$prefix")
+	if [ "$have" -eq 0 ]; then
+		echo "tinl-check: ${prefix}-NEXT without prior match" >&2
+		status=1
+		return
+	fi
+	last=$(get_last_line "$prefix")
+	exp=$((last + 1))
+	line=$(awk -v expected="$exp" -v pat="$pat" '
+		NR == expected && index($0, pat) { print NR; found=1; exit }
+		END { if(!found) exit 1 }
+	' "$tmp")
+	if [ $? -ne 0 ] || [ -z "$line" ]; then
+		echo "tinl-check: ${prefix}-NEXT failed on line $exp for: $pat" >&2
+		status=1
+		return
+	fi
+	set_last_line "$prefix" "$line"
+	set_have_last "$prefix" 1
+}
+
+check_same() {
+	prefix=$1
+	pat=$2
+	have=$(get_have_last "$prefix")
+	if [ "$have" -eq 0 ]; then
+		echo "tinl-check: ${prefix}-SAME without prior match" >&2
+		status=1
+		return
+	fi
+	target=$(get_last_line "$prefix")
+	line=$(awk -v target="$target" -v pat="$pat" '
+		NR == target && index($0, pat) { print NR; found=1; exit }
+		END { if(!found) exit 1 }
+	' "$tmp")
+	if [ $? -ne 0 ] || [ -z "$line" ]; then
+		echo "tinl-check: ${prefix}-SAME failed on line $target for: $pat" >&2
+		status=1
+		return
+	fi
+}
+
+check_empty() {
+	prefix=$1
+	have=$(get_have_last "$prefix")
+	if [ "$have" -eq 0 ]; then
+		exp=1
+	else
+		last=$(get_last_line "$prefix")
+		exp=$((last + 1))
+	fi
+	line=$(awk -v expected="$exp" '
+		NR == expected && $0 == "" { print NR; found=1; exit }
+		END { if(!found) exit 1 }
+	' "$tmp")
+	if [ $? -ne 0 ] || [ -z "$line" ]; then
+		echo "tinl-check: ${prefix}-EMPTY failed on line $exp" >&2
+		status=1
+		return
+	fi
+	set_last_line "$prefix" "$line"
+	set_have_last "$prefix" 1
+}
+
+check_count() {
+	target_count=$1
+	pat=$2
+	found=$(awk -v pat="$pat" '
+		index($0, pat) { count++ }
+		END { print count + 0 }
+	' "$tmp")
+	if [ "$found" != "$target_count" ]; then
+		echo "tinl-check: CHECK-COUNT expected $target_count, got $found for: $pat" >&2
+		status=1
+	fi
+}
+
+check_not() {
+	pat=$1
+	if awk -v pat="$pat" '
+		index($0, pat) { found=1; exit }
+		END { if(found) exit 0; exit 1 }
+	' "$tmp"; then
+		echo "tinl-check: unexpected pattern: $pat" >&2
+		status=1
+	fi
+}
+
+while IFS= read -r line || [ -n "$line" ]; do
+	for prefix in $prefixes; do
+		if [ "${line#*${prefix}-NEXT:}" != "$line" ]; then
+			content=${line#*${prefix}-NEXT:}
+			pattern=$(trim_leading "$content")
+			check_next "$prefix" "$pattern"
+			break
+		fi
+		if [ "${line#*${prefix}-SAME:}" != "$line" ]; then
+			content=${line#*${prefix}-SAME:}
+			pattern=$(trim_leading "$content")
+			check_same "$prefix" "$pattern"
+			break
+		fi
+		if [ "${line#*${prefix}-EMPTY:}" != "$line" ]; then
+			check_empty "$prefix"
+			break
+		fi
+		if [ "${line#*${prefix}-COUNT:}" != "$line" ]; then
+			content=${line#*${prefix}-COUNT:}
+			content=$(trim_leading "$content")
+			count=${content%%[!0-9]*}
+			rest=${content#"$count"}
+			rest=$(trim_leading "$rest")
+			if [ -z "$count" ] || ! printf "%s" "$count" | grep -Eq '^[0-9]+$'; then
+				echo "tinl-check: invalid ${prefix}-COUNT directive: $content" >&2
+				status=1
+			else
+				check_count "$count" "$rest"
+			fi
+			break
+		fi
+		if [ "${line#*${prefix}-NOT:}" != "$line" ]; then
+			content=${line#*${prefix}-NOT:}
+			pattern=$(trim_leading "$content")
+			check_not "$pattern"
+			break
+		fi
+		if [ "${line#*${prefix}:}" != "$line" ]; then
+			content=${line#*${prefix}:}
+			pattern=$(trim_leading "$content")
+			check_forward "$prefix" "$pattern"
+			break
+		fi
+	done
 done < "$testfile"
+
 exit $status

@@ -487,6 +487,43 @@ static void parse_unsupported(const char *line, vecstr *uns)
 	}
 }
 
+static void parse_xfail(const char *line, bool *xfail, char **reason)
+{
+	const char *p = strstr(line, "XFAIL:");
+	if(!p) return;
+	p += strlen("XFAIL:");
+	char buf[1024];
+	snprintf(buf, sizeof(buf), "%s", p);
+	char *trim = ltrim(buf);
+	rtrim_inplace(trim);
+	free(*reason);
+	*reason = (*trim) ? xstrdup(trim) : NULL;
+	*xfail = true;
+}
+
+static int parse_allow_retries(const char *line, unsigned *value)
+{
+	const char *p = strstr(line, "ALLOW_RETRIES:");
+	if(!p) return -1;
+	p += strlen("ALLOW_RETRIES:");
+	char buf[1024];
+	snprintf(buf, sizeof(buf), "%s", p);
+	char *trim = ltrim(buf);
+	rtrim_inplace(trim);
+	if(*trim == '\0') return 0;
+	errno = 0;
+	char *end = NULL;
+	unsigned long v = strtoul(trim, &end, 10);
+	if(errno || end == trim) return 0;
+	while(end && *end) {
+		if(!isspace((unsigned char)*end)) return 0;
+		end++;
+	}
+	if(v > UINT_MAX) return 0;
+	*value = (unsigned)v;
+	return 1;
+}
+
 static int run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
                          bool verbose, bool quiet)
 {
@@ -499,6 +536,10 @@ static int run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
 	vecstr runs = {0};
 	vecstr reqs = {0};
 	vecstr uns  = {0};
+	bool xfail = false;
+	char *xfail_reason = NULL;
+	unsigned allow_retries = 0;
+	bool have_allow_retries = false;
 
 	char *line = NULL;
 	size_t cap = 0;
@@ -509,6 +550,15 @@ static int run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
 		rtrim_inplace(line);
 		parse_requires(line, &reqs);
 		parse_unsupported(line, &uns);
+		parse_xfail(line, &xfail, &xfail_reason);
+		unsigned retries_val = 0;
+		int retries_parse = parse_allow_retries(line, &retries_val);
+		if(retries_parse == 1) {
+			allow_retries = retries_val;
+			have_allow_retries = true;
+		} else if(retries_parse == 0) {
+			fprintf(stderr, "%s: invalid ALLOW_RETRIES directive\n", path);
+		}
 
 		char cmd[8192];
 		if(parse_comment_run(line, cmd, sizeof(cmd))) {
@@ -573,30 +623,87 @@ static int run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
 	}
 
 	int rc = 0;
+	bool xfail_hit = false;
 	for(size_t i = 0; i < runs.n; i++) {
 		char *cmd = perform_substitutions(runs.v[i], cfgsubs, path);
+		unsigned attempts = have_allow_retries ? (allow_retries + 1) : 1;
+		if(attempts == 0) attempts = 1;
+		bool success = false;
+		int ec = 0;
 		bool timed_out = false;
-		int ec = run_shell(cmd, verbose, &timed_out);
-		if(ec != 0) {
-			if(!quiet) {
-				if(timed_out) {
-					fprintf(stderr, "[TIME] %s (step %zu exceeded %u s)\n", path, i + 1,
-					        timeout_secs);
+		unsigned used_attempts = 0;
+		for(unsigned attempt = 0; attempt < attempts; attempt++) {
+			bool this_timeout = false;
+			ec = run_shell(cmd, verbose, &this_timeout);
+			used_attempts = attempt + 1;
+			timed_out = this_timeout;
+			if(ec == 0) {
+				success = true;
+				break;
+			}
+			if(attempt + 1 < attempts && !quiet) {
+				if(this_timeout) {
+					fprintf(stderr, "[RETRY] %s (step %zu timed out, retry %u/%u)\n",
+					        path, i + 1, attempt + 2, attempts);
 				} else {
-					fprintf(stderr, "[FAIL] %s (step %zu exit %d)\n", path, i + 1, ec);
+					fprintf(stderr, "[RETRY] %s (step %zu exit %d, retry %u/%u)\n",
+					        path, i + 1, ec, attempt + 2, attempts);
+				}
+			}
+		}
+		if(!success) {
+			if(!quiet) {
+				if(xfail) {
+					const char *sep = (xfail_reason && *xfail_reason) ? "; " : "";
+					const char *msg = (xfail_reason && *xfail_reason) ? xfail_reason : "";
+					if(timed_out) {
+						fprintf(stderr, "[XFAIL] %s (step %zu timed out%s%s)\n", path,
+						        i + 1, sep, msg);
+					} else {
+						fprintf(stderr, "[XFAIL] %s (step %zu exit %d%s%s)\n", path, i + 1,
+						        ec, sep, msg);
+					}
+				} else {
+					const char *attempt_note = (used_attempts > 1) ? " after retries" : "";
+					if(timed_out) {
+						fprintf(stderr, "[TIME] %s (step %zu exceeded %u s%s)\n", path,
+						        i + 1, timeout_secs, attempt_note);
+					} else {
+						fprintf(stderr, "[FAIL] %s (step %zu exit %d%s)\n", path, i + 1,
+						        ec, attempt_note);
+					}
 				}
 			}
 			free(cmd);
-			rc = ec ? ec : 1;
+			if(xfail) {
+				xfail_hit = true;
+				rc = 0;
+			} else {
+				rc = ec ? ec : 1;
+			}
 			break;
 		}
 		free(cmd);
 	}
-	if(rc == 0 && !quiet) fprintf(stderr, "[  OK ] %s\n", path);
+	if(rc == 0) {
+		if(xfail) {
+			if(!xfail_hit) {
+				if(!quiet) {
+					const char *sep = (xfail_reason && *xfail_reason) ? ": " : "";
+					const char *msg = (xfail_reason && *xfail_reason) ? xfail_reason : "";
+					fprintf(stderr, "[XPASS] %s%s%s\n", path, sep, msg);
+				}
+				rc = 1;
+			}
+		} else {
+			if(!quiet) fprintf(stderr, "[  OK ] %s\n", path);
+		}
+	}
 
 	vecstr_free(&runs);
 	vecstr_free(&reqs);
 	vecstr_free(&uns);
+	free(xfail_reason);
 	return rc;
 }
 

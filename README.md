@@ -77,9 +77,21 @@ With the default `tinl.conf` in this repository, `%check` expands to
 `tinl-check %s`, which reads `CHECK:` lines in the test file and ensures every
 pattern appears in the piped output. You don't have to pass `%s` explicitly—tinl
 fills it in during substitution. Add more `CHECK:` lines if you need to verify
-multiple fragments. Use `CHECK-NOT:` when a fragment must be absent from the
-output; each such directive fails the test if its pattern is found. Override
-`%check` via your own config when your project
+multiple fragments. Patterns are matched in-order, so `CHECK:` expectations
+cannot leap backwards in the output. Use the helper’s siblings to cover more
+cases:
+
+- `CHECK-NOT:` fails when a substring appears anywhere in the stream.
+- `CHECK-NEXT:` insists the next output line contains the fragment.
+- `CHECK-SAME:` keeps matching on the current line.
+- `CHECK-EMPTY:` expects the next line to be blank.
+- `CHECK-COUNT: N foo` requires `foo` to be seen exactly `N` times.
+
+Need a different tag? Append options after `%check`, e.g. `| %check --check-prefix=ALT`,
+so only `ALT:` directives are honoured. Use multiple `--check-prefix` flags to match
+several prefixes in one pass.
+
+Override `%check` via your own config when your project
 needs different tooling.
 
 ## Configuration cheat sheet
@@ -97,6 +109,16 @@ needs different tooling.
 from `key = value` pairs in the config file. For example, `cc = cc -O2 -g` in
 `tinl.conf` makes `%cc` available inside `RUN:` lines. Use `-b DIR` if you
 need `%b` to land somewhere other than `bin/`.
+
+### Handling flakes and expected failures
+
+- `ALLOW_RETRIES: N` gives each `RUN:` step up to `N + 1` attempts. tinl reruns a
+  failing command until it succeeds or the allowance is exhausted, logging each
+  retry when it happens.
+- `XFAIL:` marks a test as an expected failure. tinl reports `[XFAIL]` when a
+  step fails (or times out) and considers the test successful. If every step
+  passes instead, the run is flagged as `[XPASS]` and fails overall so the stale
+  expectation gets noticed. Add an optional reason after the colon for context.
 
 ## Options refresher
 
