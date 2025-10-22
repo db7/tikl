@@ -1,2 +1,2 @@
-# RUN: ./tinl -q -c tinl.conf test/requires.c
+# RUN: ./tikl -q -c tikl.conf test/requires.c
 # CHECK: SKIP

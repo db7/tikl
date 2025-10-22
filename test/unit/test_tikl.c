@@ -2,8 +2,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#define main tinl_main
-#include "../../tinl.c"
+#define main tikl_main
+#include "../../tikl.c"
 #undef main
 int main(void)
 {

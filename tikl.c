@@ -36,7 +36,7 @@ static const char *bin_root = "bin";
 static const char *const default_scratch_root = "/tmp";
 static const char *scratch_root = "/tmp";
 static unsigned timeout_secs = 0;
-static const char tinl_version[] = "0.1.1";
+static const char tikl_version[] = "0.2";
 
 static void die(const char *fmt, ...)
 {
@@ -187,7 +187,7 @@ static char *make_temp_dir(void)
 
 	for(size_t attempt = 0; attempt < sizeof(roots) / sizeof(roots[0]); attempt++) {
 		const char *candidate = roots[attempt];
-		if(!build_temp_path(templ, sizeof(templ), candidate, "tinl.XXXXXX")) continue;
+		if(!build_temp_path(templ, sizeof(templ), candidate, "tikl.XXXXXX")) continue;
 
 		int fd = mkstemp(templ);
 		if(fd < 0) continue;
@@ -343,11 +343,11 @@ static char *perform_substitutions(const char *cmd_in, mapkv *subs,
 	if(fd >= 0) close(fd);
 	if(fd < 0) {
 		if(build_temp_path(tfile, sizeof(tfile), default_scratch_root,
-		                   "tinl-out.XXXXXX")) {
+		                   "tikl-out.XXXXXX")) {
 			fd = mkstemp(tfile);
 			if(fd >= 0) close(fd);
 		} else {
-			snprintf(tfile, sizeof(tfile), "%s/tinl-out.XXXXXX", default_scratch_root);
+			snprintf(tfile, sizeof(tfile), "%s/tikl-out.XXXXXX", default_scratch_root);
 		}
 	}
 
@@ -719,7 +719,7 @@ static void usage(const char *arg0)
 	        "  -t SECONDS   timeout for each RUN command (0 disables)\n"
 	        "  -T DIR       scratch directory root for %%t/%%T (default /tmp)\n"
 	        "  -b DIR       base directory used when expanding %%b/%%B (default bin)\n"
-	        "  -V           print tinl version and exit\n", arg0);
+	        "  -V           print tikl version and exit\n", arg0);
 }
 
 int main(int argc, char **argv)
@@ -759,7 +759,7 @@ int main(int argc, char **argv)
 			bin_root = (optarg && *optarg) ? optarg : default_bin_root;
 			break;
 		case 'V':
-			printf("tinl %s\n", tinl_version);
+			printf("tikl %s\n", tikl_version);
 			vecstr_free(&features);
 			return 0;
 		default:
@@ -775,7 +775,7 @@ int main(int argc, char **argv)
 	}
 
 	mapkv subs = {0};
-	mapkv_put(&subs, "check", "tinl-check %s");
+	mapkv_put(&subs, "check", "tikl-check %s");
 	vecstr_push(&features, "check");
 	if(cfgpath) parse_config(cfgpath, &subs);
 

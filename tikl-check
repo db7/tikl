@@ -9,12 +9,12 @@ sanitize_prefix() {
 add_prefix() {
 	p=$1
 	if [ -z "$p" ]; then
-		echo "tinl-check: empty --check-prefix" >&2
+		echo "tikl-check: empty --check-prefix" >&2
 		exit 2
 	fi
 	case "$p" in
 		*[!A-Za-z0-9_-]*)
-			echo "tinl-check: invalid prefix: $p" >&2
+			echo "tikl-check: invalid prefix: $p" >&2
 			exit 2
 			;;
 	esac
@@ -52,7 +52,7 @@ make_regex() {
 						rest=${rest#*'}}'}
 						;;
 					*)
-						echo "tinl-check: unterminated {{ in pattern: $input" >&2
+						echo "tikl-check: unterminated {{ in pattern: $input" >&2
 						return 1
 						;;
 				esac
@@ -92,7 +92,7 @@ set_have_last() {
 }
 
 usage() {
-	echo "usage: tinl-check [--check-prefix=NAME]... TESTFILE" >&2
+	echo "usage: tikl-check [--check-prefix=NAME]... TESTFILE" >&2
 	exit 2
 }
 
@@ -116,14 +116,14 @@ while [ $# -gt 0 ]; do
 			break
 			;;
 		-*)
-			echo "tinl-check: unknown option: $1" >&2
+			echo "tikl-check: unknown option: $1" >&2
 			exit 2
 			;;
 		*)
 			if [ -z "$testfile" ]; then
 				testfile="$1"
 			else
-				echo "tinl-check: unexpected argument: $1" >&2
+				echo "tikl-check: unexpected argument: $1" >&2
 				exit 2
 			fi
 			shift
@@ -141,7 +141,7 @@ if [ -z "$testfile" ]; then
 fi
 
 if [ $# -gt 0 ]; then
-	echo "tinl-check: unexpected argument: $1" >&2
+	echo "tikl-check: unexpected argument: $1" >&2
 	exit 2
 fi
 
@@ -149,9 +149,9 @@ if [ -z "$prefixes" ]; then
 	prefixes="CHECK"
 fi
 
-tmp=$(mktemp "${TMPDIR:-/tmp}/tinl-check.XXXXXX" 2>/dev/null)
+tmp=$(mktemp "${TMPDIR:-/tmp}/tikl-check.XXXXXX" 2>/dev/null)
 if [ $? -ne 0 ] || [ -z "$tmp" ]; then
-	tmp="${TMPDIR:-/tmp}/tinl-check.$$"
+	tmp="${TMPDIR:-/tmp}/tikl-check.$$"
 fi
 trap 'rm -f "$tmp"' EXIT HUP INT TERM
 
@@ -172,7 +172,7 @@ check_forward() {
 		END { if(!found) exit 1 }
 	' "$tmp")
 	if [ $? -ne 0 ] || [ -z "$line" ]; then
-		echo "tinl-check: missing pattern: $pat" >&2
+		echo "tikl-check: missing pattern: $pat" >&2
 		status=1
 		return
 	fi
@@ -189,7 +189,7 @@ check_next() {
 	}
 	have=$(get_have_last "$prefix")
 	if [ "$have" -eq 0 ]; then
-		echo "tinl-check: ${prefix}-NEXT without prior match" >&2
+		echo "tikl-check: ${prefix}-NEXT without prior match" >&2
 		status=1
 		return
 	fi
@@ -200,7 +200,7 @@ check_next() {
 		END { if(!found) exit 1 }
 	' "$tmp")
 	if [ $? -ne 0 ] || [ -z "$line" ]; then
-		echo "tinl-check: ${prefix}-NEXT failed on line $exp for: $pat" >&2
+		echo "tikl-check: ${prefix}-NEXT failed on line $exp for: $pat" >&2
 		status=1
 		return
 	fi
@@ -217,7 +217,7 @@ check_same() {
 	}
 	have=$(get_have_last "$prefix")
 	if [ "$have" -eq 0 ]; then
-		echo "tinl-check: ${prefix}-SAME without prior match" >&2
+		echo "tikl-check: ${prefix}-SAME without prior match" >&2
 		status=1
 		return
 	fi
@@ -227,7 +227,7 @@ check_same() {
 		END { if(!found) exit 1 }
 	' "$tmp")
 	if [ $? -ne 0 ] || [ -z "$line" ]; then
-		echo "tinl-check: ${prefix}-SAME failed on line $target for: $pat" >&2
+		echo "tikl-check: ${prefix}-SAME failed on line $target for: $pat" >&2
 		status=1
 		return
 	fi
@@ -247,7 +247,7 @@ check_empty() {
 		END { if(!found) exit 1 }
 	' "$tmp")
 	if [ $? -ne 0 ] || [ -z "$line" ]; then
-		echo "tinl-check: ${prefix}-EMPTY failed on line $exp" >&2
+		echo "tikl-check: ${prefix}-EMPTY failed on line $exp" >&2
 		status=1
 		return
 	fi
@@ -267,7 +267,7 @@ check_count() {
 		END { print count + 0 }
 	' "$tmp")
 	if [ "$found" != "$target_count" ]; then
-		echo "tinl-check: CHECK-COUNT expected $target_count, got $found for: $pat" >&2
+		echo "tikl-check: CHECK-COUNT expected $target_count, got $found for: $pat" >&2
 		status=1
 	fi
 }
@@ -282,7 +282,7 @@ check_not() {
 		$0 ~ regex { found=1; exit }
 		END { if(found) exit 0; exit 1 }
 	' "$tmp"; then
-		echo "tinl-check: unexpected pattern: $pat" >&2
+		echo "tikl-check: unexpected pattern: $pat" >&2
 		status=1
 	fi
 }
@@ -312,7 +312,7 @@ while IFS= read -r line || [ -n "$line" ]; do
 			rest=${content#"$count"}
 			rest=$(trim_leading "$rest")
 			if [ -z "$count" ] || ! printf "%s" "$count" | grep -Eq '^[0-9]+$'; then
-				echo "tinl-check: invalid ${prefix}-COUNT directive: $content" >&2
+				echo "tikl-check: invalid ${prefix}-COUNT directive: $content" >&2
 				status=1
 			else
 				check_count "$count" "$rest"

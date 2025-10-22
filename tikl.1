@@ -1,9 +1,9 @@
-.\" tinl manual
-.TH TINL 1 "October 2025" "tinl 0.1"
+.\" tikl manual
+.TH TIKL 1 "October 2025" "tikl 0.2"
 .SH NAME
-tinl \- tiny lit-inspired tester
+tikl \- tiny lit-inspired tester
 .SH SYNOPSIS
-.B tinl
+.B tikl
 [\-v |\-q] [\-c
 .I file
 ] [\-D
@@ -16,8 +16,8 @@ tinl \- tiny lit-inspired tester
 .I dir
 ] \fItest-file\fR ...
 .SH DESCRIPTION
-.B tinl
-("tinl is not lit") is a compact regression-test driver inspired by LLVM's lit.
+.B tikl
+("Tikl ist kein Lit") is a compact regression-test driver inspired by LLVM's lit.
 It understands the familiar \fB// RUN:\fR style annotations found in many
 compiler
 projects but keeps the implementation intentionally small and mostly vibe-coded.
@@ -57,10 +57,10 @@ Store paths produced for the \fB%b\fR/\fB%B\fR placeholders under \fIdir\fR
 instead of the default \fIbin\fR tree.
 .TP
 .B \-V
-Print the tinl version and exit.
+Print the tikl version and exit.
 .SH CONFIGURATION
-The default configuration maps \fB%check\fR to \fBtinl-check %s\fR, assuming
-\fBtinl-check\fR is available on \fBPATH\fR. Additional placeholders come from
+The default configuration maps \fB%check\fR to \fBtikl-check %s\fR, assuming
+\fBtikl-check\fR is available on \fBPATH\fR. Additional placeholders come from
 files supplied with \fB-c\fR, using simple \fIkey\fR = \fIvalue\fR lines. For
 example:
 .PP
@@ -71,7 +71,7 @@ example:
 .PP
 This makes \fB%cc\fR and \fB%linker\fR available inside \fBRUN:\fR directives.
 .SH DIRECTIVES
-tinl recognises the following case-sensitive directives inside line comments:
+tikl recognises the following case-sensitive directives inside line comments:
 .TP
 \fBRUN:\fR command
 Collects the shell \fIcommand\fR to execute for the current test.
@@ -87,7 +87,7 @@ Retries each \fBRUN:\fR command up to \fIcount\fR additional times when it
 fails or times out. The allowance applies per step.
 .TP
 \fBXFAIL:\fR [reason]
-Marks the test as an expected failure. tinl reports \[lq]XFAIL\[rq] when a
+Marks the test as an expected failure. tikl reports \[lq]XFAIL\[rq] when a
 step fails (or times out) and treats the test as passed. If every step
 succeeds, the run is flagged as \[lq]XPASS\[rq] and fails overall. An optional
 \fIreason\fR after the colon is printed alongside the status.
@@ -115,7 +115,7 @@ Directory component of \fB%b\fR.
 .PP
 User-defined placeholders come from the configuration file supplied with
 \fB-c\fR. For example, \fBcc = cc -O2 -g\fR makes \fB%cc\fR available. The
-\fB%check\fR placeholder resolves to \fBtinl-check %s\fR by default and can be
+\fB%check\fR placeholder resolves to \fBtikl-check %s\fR by default and can be
 overridden the same way. The helper recognises \fBCHECK:\fR, \fBCHECK-NOT:\fR,
 \fBCHECK-NEXT:\fR, \fBCHECK-SAME:\fR, \fBCHECK-EMPTY:\fR, and \fBCHECK-COUNT:\fR
 directives. Plain \fBCHECK:\fR patterns must appear in order. \fBCHECK-NEXT:\fR

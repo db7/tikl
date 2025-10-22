@@ -11,34 +11,34 @@ BINDIR?=	${PREFIX}/bin
 MANDIR?=	${PREFIX}/share/man/man1
 INSTALL?=	install
 MKDIR_P?=	mkdir -p
-TARGET=		tinl
+TARGET=		tikl
 
 all: ${TARGET}
 
-${TARGET}: tinl.c
-	${CC} ${CFLAGS_} -o ${TARGET} tinl.c
+${TARGET}: tikl.c
+	${CC} ${CFLAGS_} -o ${TARGET} tikl.c
 
 clean:
 	rm -f ${TARGET} test_unit
 	rm -rf bin
 	${MKDIR_P} bin
 
-test_unit: tinl.c test/unit/test_tinl.c
-	${CC} ${CFLAGS} -o test_unit test/unit/test_tinl.c
+test_unit: tikl.c test/unit/test_tikl.c
+	${CC} ${CFLAGS} -o test_unit test/unit/test_tikl.c
 
 test_integration: all
 	sh test/run-tests.sh
 
 selfcheck: all
-	./tinl -q -c tinl.conf test/self
+	./tikl -q -c tikl.conf test/self
 
 test: test_unit test_integration selfcheck
 
-install: ${TARGET} tinl.1
+install: ${TARGET} tikl.1
 	${MKDIR_P} ${DESTDIR}${BINDIR}
 	${INSTALL} -m 755 ${TARGET} ${DESTDIR}${BINDIR}/${TARGET}
-	${INSTALL} -m 755 tinl-check ${DESTDIR}${BINDIR}/tinl-check
+	${INSTALL} -m 755 tikl-check ${DESTDIR}${BINDIR}/tikl-check
 	${MKDIR_P} ${DESTDIR}${MANDIR}
-	${INSTALL} -m 644 tinl.1 ${DESTDIR}${MANDIR}/tinl.1
+	${INSTALL} -m 644 tikl.1 ${DESTDIR}${MANDIR}/tikl.1
 
 .PHONY: all clean test test_unit test_integration selfcheck install

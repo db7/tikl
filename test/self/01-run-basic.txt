@@ -1,2 +1,2 @@
-# RUN: ./tinl -q -c tinl.conf test/basic.c
+# RUN: ./tikl -q -c tikl.conf test/basic.c
 # CHECK: [  OK ] test/basic.c
