@@ -100,8 +100,8 @@ needs different tooling.
 
 | Placeholder | Expands to                               |
 |-------------|------------------------------------------|
-| `%s`        | Current test file path                   |
-| `%S`        | Directory containing the current test    |
+| `%s`        | Absolute path to the current test file   |
+| `%S`        | Absolute directory containing the test   |
 | `%t`        | Scratch file path unique to this command |
 | `%T`        | Scratch directory                        |
 | `%b`        | Path in `bin/` mirroring the source name |
@@ -144,4 +144,3 @@ the full-featured original, check out the [LLVM lit
 documentation](https://llvm.org/docs/CommandGuide/lit.html).
 
 Note that the original version of this program was mostly vibe-coded.
-

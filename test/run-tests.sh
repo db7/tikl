@@ -7,6 +7,7 @@ set -eu
 ./tikl -q -c tikl.conf test/check-prefix.c
 ./tikl -q -c tikl.conf test/check-prefix-multi.c
 ./tikl -q -c tikl.conf test/multi-run.c
+./tikl -q -c tikl.conf test/subst-abs.txt
 ./tikl -q -c tikl.conf test/a/b/c.c
 ./tikl -q -c tikl.conf test/allow-retries.c
 ./tikl -q -c tikl.conf test/xfail.c

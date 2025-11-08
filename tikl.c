@@ -36,7 +36,7 @@ static const char *bin_root = "bin";
 static const char *const default_scratch_root = "/tmp";
 static const char *scratch_root = "/tmp";
 static unsigned timeout_secs = 0;
-static const char tikl_version[] = "0.2";
+static const char tikl_version[] = "0.2.1";
 
 static void die(const char *fmt, ...)
 {
@@ -315,10 +315,12 @@ static char *subst_once(const char *in, const char *sym, const char *val)
 }
 
 static char *perform_substitutions(const char *cmd_in, mapkv *subs,
-                                   const char *testpath)
+                                   const char *testpath,
+                                   const char *testpath_abs)
 {
 	char s_dir[PATH_MAX];
-	path_dirname(testpath, s_dir, sizeof(s_dir));
+	const char *path_for_dir = testpath_abs ? testpath_abs : testpath;
+	path_dirname(path_for_dir, s_dir, sizeof(s_dir));
 	char bmap[PATH_MAX];
 	map_source_to_bin(testpath, bmap, sizeof(bmap));
 	char bdir[PATH_MAX];
@@ -368,7 +370,8 @@ static char *perform_substitutions(const char *cmd_in, mapkv *subs,
 	const char *scratch_for_T = tdir ? tdir : ((scratch_root
 	                            && *scratch_root) ? scratch_root : default_scratch_root);
 
-	x = subst_once(cmd, "s", testpath);
+	const char *path_for_s = testpath_abs ? testpath_abs : testpath;
+	x = subst_once(cmd, "s", path_for_s);
 	free(cmd);
 	cmd = x;
 	x = subst_once(cmd, "S", s_dir);
@@ -540,6 +543,14 @@ static int run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
 		return 2;
 	}
 
+	char testpath_abs_buf[PATH_MAX];
+	if(!realpath(path, testpath_abs_buf)) {
+		fprintf(stderr, "realpath %s: %s\n", path, strerror(errno));
+		fclose(f);
+		return 2;
+	}
+	const char *testpath_abs = testpath_abs_buf;
+
 	vecstr runs = {0};
 	vecstr reqs = {0};
 	vecstr uns  = {0};
@@ -632,7 +643,7 @@ static int run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
 	int rc = 0;
 	bool xfail_hit = false;
 	for(size_t i = 0; i < runs.n; i++) {
-		char *cmd = perform_substitutions(runs.v[i], cfgsubs, path);
+		char *cmd = perform_substitutions(runs.v[i], cfgsubs, path, testpath_abs);
 		unsigned attempts = have_allow_retries ? (allow_retries + 1) : 1;
 		if(attempts == 0) attempts = 1;
 		bool success = false;
