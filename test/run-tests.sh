@@ -8,6 +8,9 @@ set -eu
 ./tikl -q -c tikl.conf test/check-prefix-multi.c
 ./tikl -q -c tikl.conf test/multi-run.c
 ./tikl -q -c tikl.conf test/subst-abs.txt
+./tikl -q -c tikl.conf test/check-subst.c
+./tikl -q -c tikl.conf test/check-paren.txt
+./tikl -q -c tikl.conf test/check-paren-escape.txt
 ./tikl -q -c tikl.conf test/a/b/c.c
 ./tikl -q -c tikl.conf test/allow-retries.c
 ./tikl -q -c tikl.conf test/xfail.c
@@ -23,6 +26,9 @@ if ./tikl -q -c tikl.conf test/robust/allow-retries-exhaust.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/xfail-xpass.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/check-prefix-miss.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/check-regex-miss.c ; then exit 1; fi
+if ./tikl -q -L -c tikl.conf test/check-paren.txt ; then exit 1; fi
+./tikl -q -L -c tikl.conf test/check-paren-escape.txt
+if ./tikl -q -L -c tikl.conf test/check-subst.c ; then exit 1; fi
 ./tikl -q test/robust/empty.txt
 ./tikl -q test/robust/long-continue.txt
 echo "integration: OK"

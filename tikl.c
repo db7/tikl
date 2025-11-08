@@ -36,7 +36,8 @@ static const char *bin_root = "bin";
 static const char *const default_scratch_root = "/tmp";
 static const char *scratch_root = "/tmp";
 static unsigned timeout_secs = 0;
-static const char tikl_version[] = "0.2.1";
+static const char tikl_version[] = "0.3";
+static bool lit_compat = false;
 
 static void die(const char *fmt, ...)
 {
@@ -314,6 +315,22 @@ static char *subst_once(const char *in, const char *sym, const char *val)
 	return out;
 }
 
+static char *apply_config_substitutions(const char *input, mapkv *subs)
+{
+	char *cmd = xstrdup(input);
+	for(int pass = 0; pass < 8; pass++) {
+		bool changed = false;
+		for(size_t i = 0; i < subs->n; i++) {
+			char *next = subst_once(cmd, subs->v[i].key, subs->v[i].val);
+			if(strcmp(next, cmd) != 0) changed = true;
+			free(cmd);
+			cmd = next;
+		}
+		if(!changed) break;
+	}
+	return cmd;
+}
+
 static char *perform_substitutions(const char *cmd_in, mapkv *subs,
                                    const char *testpath,
                                    const char *testpath_abs)
@@ -353,18 +370,7 @@ static char *perform_substitutions(const char *cmd_in, mapkv *subs,
 		}
 	}
 
-	char *cmd = xstrdup(cmd_in);
-
-	for(int pass = 0; pass < 8; pass++) {
-		bool changed = false;
-		for(size_t i = 0; i < subs->n; i++) {
-			char *next = subst_once(cmd, subs->v[i].key, subs->v[i].val);
-			if(strcmp(next, cmd) != 0) changed = true;
-			free(cmd);
-			cmd = next;
-		}
-		if(!changed) break;
-	}
+	char *cmd = apply_config_substitutions(cmd_in, subs);
 
 	char *x;
 	const char *scratch_for_T = tdir ? tdir : ((scratch_root
@@ -392,6 +398,92 @@ static char *perform_substitutions(const char *cmd_in, mapkv *subs,
 
 	free(tdir);
 	return cmd;
+}
+
+static void push_sub_line(vecstr *lines, const char *key, const char *val)
+{
+	size_t nk = strlen(key);
+	size_t nv = strlen(val);
+	char *buf = malloc(nk + 1 + nv + 1);
+	if(!buf) die("OOM");
+	memcpy(buf, key, nk);
+	buf[nk] = '=';
+	memcpy(buf + nk + 1, val, nv + 1);
+	vecstr_push(lines, buf);
+	free(buf);
+}
+
+static char *expand_for_check_value(const char *input, mapkv *subs,
+                                    const char *path_for_s,
+                                    const char *s_dir,
+                                    const char *bmap,
+                                    const char *bdir)
+{
+	char *cmd = apply_config_substitutions(input, subs);
+	char *x = subst_once(cmd, "s", path_for_s);
+	free(cmd);
+	cmd = x;
+	x = subst_once(cmd, "S", s_dir);
+	free(cmd);
+	cmd = x;
+	x = subst_once(cmd, "b", bmap);
+	free(cmd);
+	cmd = x;
+	x = subst_once(cmd, "B", bdir);
+	free(cmd);
+	cmd = x;
+	return cmd;
+}
+
+static char *build_check_subs_blob(mapkv *subs, const char *testpath,
+                                   const char *testpath_abs)
+{
+	const char *path_for_s = (testpath_abs && *testpath_abs) ? testpath_abs : testpath;
+	char s_dir[PATH_MAX];
+	path_dirname(path_for_s, s_dir, sizeof(s_dir));
+	char bmap[PATH_MAX];
+	map_source_to_bin(testpath, bmap, sizeof(bmap));
+	char bdir[PATH_MAX];
+	path_dirname(bmap, bdir, sizeof(bdir));
+	ensure_dir(bdir);
+
+	vecstr lines = {0};
+	push_sub_line(&lines, "s", path_for_s);
+	push_sub_line(&lines, "S", s_dir);
+	push_sub_line(&lines, "b", bmap);
+	push_sub_line(&lines, "B", bdir);
+
+	for(size_t i = 0; i < subs->n; i++) {
+		const char *key = subs->v[i].key;
+		if(strcmp(key, "s") == 0 || strcmp(key, "S") == 0 ||
+		   strcmp(key, "b") == 0 || strcmp(key, "B") == 0) {
+			continue;
+		}
+		char *expanded = expand_for_check_value(subs->v[i].val, subs,
+		                                      path_for_s, s_dir, bmap, bdir);
+		push_sub_line(&lines, key, expanded);
+		free(expanded);
+	}
+
+	if(lines.n == 0) {
+		vecstr_free(&lines);
+		return NULL;
+	}
+
+	size_t total = 0;
+	for(size_t i = 0; i < lines.n; i++) total += strlen(lines.v[i]) + 1;
+	char *blob = malloc(total);
+	if(!blob) die("OOM");
+	size_t off = 0;
+	for(size_t i = 0; i < lines.n; i++) {
+		size_t len = strlen(lines.v[i]);
+		if(i > 0) blob[off++] = '\n';
+		memcpy(blob + off, lines.v[i], len);
+		off += len;
+	}
+	blob[off] = '\0';
+	vecstr_free(&lines);
+	return blob;
 }
 
 static int run_shell(const char *cmd, bool verbose, bool *timed_out)
@@ -550,6 +642,35 @@ static int run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
 		return 2;
 	}
 	const char *testpath_abs = testpath_abs_buf;
+	if(lit_compat) {
+		unsetenv("TIKL_CHECK_SUBSTS");
+	} else {
+		char *check_env = build_check_subs_blob(cfgsubs, path, testpath_abs);
+		if(check_env) {
+			if(setenv("TIKL_CHECK_SUBSTS", check_env, 1) != 0) {
+				fprintf(stderr, "setenv TIKL_CHECK_SUBSTS: %s\n", strerror(errno));
+				free(check_env);
+				fclose(f);
+				unsetenv("TIKL_CHECK_SUBSTS");
+				unsetenv("TIKL_LIT_COMPAT");
+				return 2;
+			}
+			free(check_env);
+		} else {
+			unsetenv("TIKL_CHECK_SUBSTS");
+		}
+	}
+	if(lit_compat) {
+		if(setenv("TIKL_LIT_COMPAT", "1", 1) != 0) {
+			fprintf(stderr, "setenv TIKL_LIT_COMPAT: %s\n", strerror(errno));
+			fclose(f);
+			unsetenv("TIKL_CHECK_SUBSTS");
+			unsetenv("TIKL_LIT_COMPAT");
+			return 2;
+		}
+	} else {
+		unsetenv("TIKL_LIT_COMPAT");
+	}
 
 	vecstr runs = {0};
 	vecstr reqs = {0};
@@ -622,20 +743,24 @@ static int run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
 	for(size_t i = 0; i < reqs.n; i++) {
 		if(!has_feature(features, reqs.v[i])) {
 			if(!quiet) fprintf(stderr, "[ SKIP] %s (missing feature: %s)\n", path,
-				                   reqs.v[i]);
+			                   reqs.v[i]);
 			vecstr_free(&runs);
 			vecstr_free(&reqs);
 			vecstr_free(&uns);
+			unsetenv("TIKL_CHECK_SUBSTS");
+			unsetenv("TIKL_LIT_COMPAT");
 			return 0;
 		}
 	}
 	for(size_t i = 0; i < uns.n; i++) {
 		if(has_feature(features, uns.v[i])) {
 			if(!quiet) fprintf(stderr, "[ SKIP] %s (unsupported on feature: %s)\n", path,
-				                   uns.v[i]);
+			                   uns.v[i]);
 			vecstr_free(&runs);
 			vecstr_free(&reqs);
 			vecstr_free(&uns);
+			unsetenv("TIKL_CHECK_SUBSTS");
+			unsetenv("TIKL_LIT_COMPAT");
 			return 0;
 		}
 	}
@@ -722,6 +847,8 @@ static int run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
 	vecstr_free(&reqs);
 	vecstr_free(&uns);
 	free(xfail_reason);
+	unsetenv("TIKL_CHECK_SUBSTS");
+	unsetenv("TIKL_LIT_COMPAT");
 	return rc;
 }
 
@@ -729,7 +856,7 @@ static void usage(const char *arg0)
 {
 	fprintf(stderr,
 	        "Usage: %s [-v|-q] [-c config] [-D feature]... [-t seconds] "
-	        "[-T scratch] [-b binroot] FILE...\n"
+	        "[-T scratch] [-b binroot] [-L] FILE...\n"
 	        "  -v           verbose shell commands\n"
 	        "  -q           quiet (only pass/fail)\n"
 	        "  -c FILE      substitution config (lines: key = value)\n"
@@ -737,6 +864,7 @@ static void usage(const char *arg0)
 	        "  -t SECONDS   timeout for each RUN command (0 disables)\n"
 	        "  -T DIR       scratch directory root for %%t/%%T (default /tmp)\n"
 	        "  -b DIR       base directory used when expanding %%b/%%B (default bin)\n"
+	        "  -L           force lit-compatible behaviour (disable tikl extras)\n"
 	        "  -V           print tikl version and exit\n", arg0);
 }
 
@@ -747,7 +875,7 @@ int main(int argc, char **argv)
 	vecstr features = {0};
 
 	int opt;
-	while((opt = getopt(argc, argv, "vqc:D:t:T:b:V")) != -1) {
+	while((opt = getopt(argc, argv, "vqc:D:t:T:b:VL")) != -1) {
 		switch(opt) {
 		case 'v':
 			verbose = true;
@@ -780,6 +908,9 @@ int main(int argc, char **argv)
 			printf("tikl %s\n", tikl_version);
 			vecstr_free(&features);
 			return 0;
+		case 'L':
+			lit_compat = true;
+			break;
 		default:
 			usage(argv[0]);
 			return 2;

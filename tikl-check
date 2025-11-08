@@ -29,8 +29,118 @@ trim_leading() {
 	printf "%s" "$1" | sed 's/^[[:space:]]*//'
 }
 
+apply_check_substs() {
+	input=$1
+	if [ "${TIKL_LIT_COMPAT-}" = "1" ]; then
+		printf "%s" "$input"
+		return
+	fi
+	if [ -z "${TIKL_CHECK_SUBSTS-}" ]; then
+		printf "%s" "$input"
+		return
+	fi
+	printf '%s\n' "$input" | awk '
+BEGIN {
+	subs = ENVIRON["TIKL_CHECK_SUBSTS"];
+	count = split(subs, lines, "\n");
+	for(i = 1; i <= count; i++) {
+		line = lines[i];
+		if(line == "") continue;
+		sep = index(line, "=");
+		if(sep == 0) continue;
+		key = substr(line, 1, sep - 1);
+		val = substr(line, sep + 1);
+		map[key] = val;
+	}
+}
+{
+	line = $0;
+	out = "";
+	i = 1;
+	len = length(line);
+	while(i <= len) {
+		c = substr(line, i, 1);
+		if(c == "%") {
+			if(i < len && substr(line, i + 1, 1) == "%") {
+				out = out "%";
+				i += 2;
+				continue;
+			}
+			j = i + 1;
+			ident = "";
+			while(j <= len) {
+				ch = substr(line, j, 1);
+				if(ch ~ /[A-Za-z0-9_]/) {
+					ident = ident ch;
+					j++;
+				} else {
+					break;
+				}
+			}
+			if(ident != "") {
+				if(ident in map) {
+					out = out map[ident];
+				} else {
+					out = out "%" ident;
+				}
+				i = j;
+			} else {
+				out = out "%";
+				i++;
+			}
+		} else {
+			out = out c;
+			i++;
+		}
+	}
+	printf "%s", out;
+}
+'
+}
+
 escape_literal() {
-	printf "%s" "$1" | sed 's/[].[^$\\*/+?{}()|]/\\&/g'
+	if [ "${TIKL_LIT_COMPAT-}" = "1" ]; then
+		printf "%s" "$1" | awk '
+BEGIN { specials = "][][.^$\\*/+?{}|" }
+{
+	out="";
+	for(i = 1; i <= length($0); i++) {
+		c = substr($0, i, 1);
+		if(index(specials, c) > 0) {
+			out = out "\\" c;
+		} else {
+			out = out c;
+		}
+	}
+	printf "%s", out;
+}'
+	else
+ 		printf "%s" "$1" | awk '
+BEGIN { specials = "][][.^$\\*/+?{}()|" }
+{
+	out="";
+	i = 1;
+	n = length($0);
+	while(i <= n) {
+		c = substr($0, i, 1);
+		if(c == "\\" && i < n) {
+			nxt = substr($0, i + 1, 1);
+			if(index(specials, nxt) > 0) {
+				out = out "\\\\" nxt;
+				i += 2;
+				continue;
+			}
+		}
+		if(index(specials, c) > 0) {
+			out = out "\\\\" c;
+		} else {
+			out = out c;
+		}
+		i++;
+	}
+	printf "%s", out;
+}'
+	fi
 }
 
 make_regex() {
@@ -292,12 +402,14 @@ while IFS= read -r line || [ -n "$line" ]; do
 		if [ "${line#*${prefix}-NEXT:}" != "$line" ]; then
 			content=${line#*${prefix}-NEXT:}
 			pattern=$(trim_leading "$content")
+			pattern=$(apply_check_substs "$pattern")
 			check_next "$prefix" "$pattern"
 			break
 		fi
 		if [ "${line#*${prefix}-SAME:}" != "$line" ]; then
 			content=${line#*${prefix}-SAME:}
 			pattern=$(trim_leading "$content")
+			pattern=$(apply_check_substs "$pattern")
 			check_same "$prefix" "$pattern"
 			break
 		fi
@@ -315,6 +427,7 @@ while IFS= read -r line || [ -n "$line" ]; do
 				echo "tikl-check: invalid ${prefix}-COUNT directive: $content" >&2
 				status=1
 			else
+				rest=$(apply_check_substs "$rest")
 				check_count "$count" "$rest"
 			fi
 			break
@@ -322,12 +435,14 @@ while IFS= read -r line || [ -n "$line" ]; do
 		if [ "${line#*${prefix}-NOT:}" != "$line" ]; then
 			content=${line#*${prefix}-NOT:}
 			pattern=$(trim_leading "$content")
+			pattern=$(apply_check_substs "$pattern")
 			check_not "$pattern"
 			break
 		fi
 		if [ "${line#*${prefix}:}" != "$line" ]; then
 			content=${line#*${prefix}:}
 			pattern=$(trim_leading "$content")
+			pattern=$(apply_check_substs "$pattern")
 			check_forward "$prefix" "$pattern"
 			break
 		fi

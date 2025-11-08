@@ -73,28 +73,43 @@ int main(void) {
 }
 ```
 
-With the default `tikl.conf` in this repository, `%check` expands to
-`tikl-check %s`, which reads `CHECK:` lines in the test file and ensures every
-pattern appears in the piped output. You don't have to pass `%s` explicitly—tikl
-fills it in during substitution. Add more `CHECK:` lines if you need to verify
-multiple fragments. Patterns are matched in-order, so `CHECK:` expectations
-cannot leap backwards in the output. Use the helper’s siblings to cover more
-cases:
+## `%check` and `CHECK:` helpers
 
-- `CHECK-NOT:` fails when a substring appears anywhere in the stream.
+With the default `tikl.conf` in this repository, `%check` expands to
+`tikl-check %s`, which reads `CHECK:` family directives in the test file and
+ensures the output obeys each expectation. You don't have to pass `%s`
+explicitly—tikl fills it in during substitution. Patterns are matched in order,
+so `CHECK:` expectations cannot leap backwards in the stream.
+
+Supported directives:
+
+- `CHECK:` looks for the literal fragment (or regex block) anywhere after the
+  previous match.
+- `CHECK-NOT:` fails when the substring appears anywhere in the remaining
+  output.
 - `CHECK-NEXT:` insists the next output line contains the fragment.
 - `CHECK-SAME:` keeps matching on the current line.
 - `CHECK-EMPTY:` expects the next line to be blank.
 - `CHECK-COUNT: N foo` requires `foo` to be seen exactly `N` times.
-- Embed regular expressions inline with `{{...}}`; literal text around the block
-  is matched verbatim, so `CHECK: value={{[0-9]+}}` accepts `value=123`.
+- Embed regular expressions inline with `{{...}}`; surrounding text is matched
+  literally, so `CHECK: value={{[0-9]+}}` accepts `value=123`.
+
+tikl deliberately diverges from LLVM's FileCheck/lit in two ways:
+
+1. `%placeholder` tokens are expanded inside every `CHECK` variant. Values come
+   from your substitution config (e.g. `%foo` from `foo = ...`) plus the built-in
+   `%s`, `%S`, `%b`, and `%B`. Use `%%name` to keep the literal text `%name`.
+2. Literal text outside `{{...}}` is treated as literal text, so parentheses and
+   other regex metacharacters do not need escaping.
+
+Pass `-L` to tikl when you need lit-compatible behaviour: `%` tokens are left
+verbatim and regex metacharacters regain their default meaning (so `foo(bar)`
+must be written as `foo\(bar\)`).
 
 Need a different tag? Append options after `%check`, e.g. `| %check --check-prefix=ALT`,
 so only `ALT:` directives are honoured. Use multiple `--check-prefix` flags to match
-several prefixes in one pass.
-
-Override `%check` via your own config when your project
-needs different tooling.
+several prefixes in one pass, or override `%check` entirely via your own config
+when a different helper better suits your project.
 
 ## Configuration
 
@@ -126,6 +141,7 @@ need `%b` to land somewhere other than `bin/`.
 
 - `-T DIR` — change the scratch directory root used for `%t`/`%T`.
 - `-b DIR` — change the root directory used for `%b`/`%B` (defaults to `bin`).
+- `-L` — force lit-compatible behaviour (turn off non-standard tikl extensions).
 - `-t SECONDS` — terminate any `RUN` command that exceeds the given wall-clock
   budget (returns exit code 124).
 - `-V` — print the tikl version and exit.

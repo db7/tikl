@@ -1,0 +1,2 @@
+# RUN: printf 'foo(bar)\n' | %check
+# CHECK: foo\(bar\)

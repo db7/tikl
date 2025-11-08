@@ -1,5 +1,5 @@
 .\" tikl manual
-.TH TIKL 1 "October 2025" "tikl 0.2"
+.TH TIKL 1 "November 2025" "tikl 0.3"
 .SH NAME
 tikl \- tiny lit-inspired tester
 .SH SYNOPSIS
@@ -55,6 +55,11 @@ Use \fIdir\fR as the root for scratch files associated with the \fB%t\fR and
 .BI \-b " dir"
 Store paths produced for the \fB%b\fR/\fB%B\fR placeholders under \fIdir\fR
 instead of the default \fIbin\fR tree.
+.TP
+.B \-L
+Force FileCheck/lit-compatible behaviour in the helper. `%placeholder`
+expansion inside `CHECK` directives is disabled and regex metacharacters must be
+escaped explicitly, matching lit's defaults.
 .TP
 .B \-V
 Print the tikl version and exit.
@@ -126,6 +131,20 @@ Passing \fB--check-prefix=ALT\fR (repeatable) after \fB%check\fR switches the
 accepted prefixes to \fBALT\fR, \fBALT-NEXT\fR, and so on.
 Regex fragments can be embedded inline with \fB{{...}}\fR; surrounding text is
 still matched literally.
+.SH CHECK DIRECTIVES
+The `tikl-check` helper deliberately deviates from LLVM FileCheck in two ways:
+.IP 1.
+`%placeholder` tokens (from `tikl.conf` or built-ins such as `%s`, `%S`, `%b`,
+and `%B`) are expanded inside every `CHECK` variant. Write `%%name` to keep a
+literal percent sequence.
+.IP 2.
+Literal text outside `{{...}}` regex blocks is treated verbatim, so characters
+like `(` or `)` no longer require escaping.
+.PP
+These conveniences speed up day-to-day authoring, but pass `-L` to `tikl` when
+you need strict FileCheck compatibility—both deviations are disabled and regex
+metacharacters regain their default meaning. Regardless of mode you can use
+`--check-prefix` after `%check` to select alternate directive tags.
 .SH EXAMPLES
 .PP
 The snippet below builds a small helper, runs it, and checks the produced
