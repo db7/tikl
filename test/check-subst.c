@@ -5,7 +5,9 @@
 
 #include <stdio.h>
 
-int main(void) {
+int
+main(void)
+{
     puts("value = substituted");
     puts("literal %foo");
     return 0;

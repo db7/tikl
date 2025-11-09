@@ -6,7 +6,8 @@
 // CHECK-EMPTY:
 // CHECK-NOT: gamma
 // CHECK-COUNT: 2 count me
-int main(void)
+int
+main(void)
 {
-	return 0;
+    return 0;
 }

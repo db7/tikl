@@ -1,7 +1,8 @@
 // REQUIRES: check
 // RUN: echo hello world | %check
 // CHECK: hello world
-int main(void)
+int
+main(void)
 {
-	return 0;
+    return 0;
 }

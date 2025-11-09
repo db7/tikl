@@ -5,6 +5,7 @@ bin/
 tikl.1
 VERSION
 *.o
+*.orig
 *.dSYM/
 fuzz/out/
 fuzz/build/

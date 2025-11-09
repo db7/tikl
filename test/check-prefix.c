@@ -2,7 +2,8 @@
 // RUN: printf 'alpha\nbeta\n' | %check --check-prefix=FOO
 // FOO: alpha
 // FOO-NEXT: beta
-int main(void)
+int
+main(void)
 {
-	return 0;
+    return 0;
 }

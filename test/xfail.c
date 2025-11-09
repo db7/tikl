@@ -1,6 +1,7 @@
 // XFAIL: known bug
 // RUN: false
-int main(void)
+int
+main(void)
 {
-	return 0;
+    return 0;
 }

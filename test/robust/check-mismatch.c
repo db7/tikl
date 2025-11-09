@@ -2,8 +2,9 @@
 // RUN: %b | %check
 // CHECK: goodbye
 #include <stdio.h>
-int main(void)
+int
+main(void)
 {
-	puts("hello");
-	return 0;
+    puts("hello");
+    return 0;
 }
