@@ -345,17 +345,14 @@ static char *apply_placeholders(const char *input, bool lit_compat,
                 len++;
                 q++;
             }
-            if(len > 0 && subs->n > 0 && !lit_compat) {
-                const char *val = lookup_subst(subs, p + 1, len);
+            if(len > 0) {
+                const char *val = (!lit_compat && subs->n > 0) ? lookup_subst(subs, p + 1, len) : NULL;
                 if(val) {
                     strbuf_append_str(&sb, val);
-                    p = q;
-                    continue;
+                } else {
+                    strbuf_append_char(&sb, '%');
+                    for(size_t i = 0; i < len; i++) strbuf_append_char(&sb, p[1 + i]);
                 }
-            }
-            if(len > 0) {
-                strbuf_append_char(&sb, '%');
-                for(size_t i = 0; i < len; i++) strbuf_append_char(&sb, p[1 + i]);
                 p = q;
             } else {
                 strbuf_append_char(&sb, '%');

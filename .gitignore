@@ -2,6 +2,8 @@ tikl
 tikl-check
 test_unit
 bin/
+tikl.1
+VERSION
 *.o
 *.dSYM/
 fuzz/out/
