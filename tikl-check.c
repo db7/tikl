@@ -611,8 +611,8 @@ int main(int argc, char **argv)
 
     for(int i = 1; i < argc; i++) {
         const char *arg = argv[i];
-        if(strncmp(arg, "--check-prefix=", 16) == 0) {
-            add_prefix(&prefixes, arg + 16);
+        if(strncmp(arg, "--check-prefix=", 15) == 0) {
+            add_prefix(&prefixes, arg + 15);
         } else if(strcmp(arg, "--check-prefix") == 0) {
             if(i + 1 >= argc) usage(argv[0]);
             add_prefix(&prefixes, argv[++i]);
