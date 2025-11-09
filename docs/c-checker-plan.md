@@ -93,27 +93,24 @@ source file -> directive parser -> matcher engine -> exit status
 
 ## Incremental Delivery
 
-1. **Scaffolding (this step)**
-   - Add `tikl-check.c` with CLI parsing, placeholder structs, and TODO hooks.
-   - Wire up a `make tikl-check-c` target so the binary builds but isn’t used yet.
+1. **Scaffolding** ✅
+   - `tikl-check.c` now hosts the CLI, placeholder handling, and matcher.
 
-2. **Core Port**
-   - Implement directive parsing, literal/regex handling, and forward matching.
-   - Reuse the existing tests by temporarily pointing `%check` to
-     `tikl-check-c` under CI to compare outputs.
+2. **Core Port** ✅
+   - Directive parsing and literal/regex matching are implemented, with `%check`
+     pointing to the C binary by default.
 
-3. **Directive Parity**
-   - Add CHECK-NEXT/SAME/EMPTY/COUNT/NOT plus multi-prefix support.
-   - Validate against the negative tests in `test/robust/*`.
+3. **Directive/Feature Parity** ✅
+   - All CHECK variants, `%` substitutions, lit compatibility, and diagnostics
+     match the old script; the regression suite runs entirely through the new
+     helper.
 
-4. **Feature Parity**
-   - Add `%` substitution, lit compat mode, and identical diagnostics.
-   - Remove the shell script once confidence is high, or ship both with a flag
-     to pick the implementation during a transition release.
-
-5. **Maintenance**
-   - Hook the new checker into `install`, ensure the man page references the C
-     binary, and delete the script when ready.
+4. **Considerations Going Forward**
+   - Keep fuzzing the parser/matcher (reuse `fuzz/` harness) to catch edge cases.
+   - If new directives or matching modes are added, update both this document
+     and the regression tests to keep the contract explicit.
+   - Monitor performance on large logs; if needed, explore streaming instead of
+     buffering all lines.
 
 Keeping the plan in-tree lets us track progress towards tikl 0.4, and we can
 update this document as design decisions evolve.

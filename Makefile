@@ -12,7 +12,7 @@ MANDIR?=	${PREFIX}/man/man1
 INSTALL?=	install
 MKDIR_P?=	mkdir -p
 TARGET=		tikl
-CHECK_TARGET=	tikl-check-c
+CHECK_TARGET=	tikl-check
 
 all: ${TARGET} ${CHECK_TARGET}
 
@@ -38,10 +38,10 @@ selfcheck: all
 
 test: test_unit test_integration selfcheck
 
-install: ${TARGET} tikl.1
+install: ${TARGET} ${CHECK_TARGET} tikl.1
 	${MKDIR_P} ${DESTDIR}${BINDIR}
 	${INSTALL} -m 755 ${TARGET} ${DESTDIR}${BINDIR}/${TARGET}
-	${INSTALL} -m 755 tikl-check ${DESTDIR}${BINDIR}/tikl-check
+	${INSTALL} -m 755 ${CHECK_TARGET} ${DESTDIR}${BINDIR}/tikl-check
 	${MKDIR_P} ${DESTDIR}${MANDIR}
 	${INSTALL} -m 644 tikl.1 ${DESTDIR}${MANDIR}/tikl.1
 
