@@ -10,6 +10,7 @@ set -eu
 ./tikl -q -c tikl.conf test/multi-run.c
 ./tikl -q -c tikl.conf test/subst-abs.txt
 ./tikl -q -c tikl.conf test/check-subst.c
+./tikl -q -c tikl.conf test/check-functions.txt
 ./tikl -q -c tikl.conf test/check-paren.txt
 ./tikl -q -c tikl.conf test/check-paren-escape.txt
 ./tikl -q -c tikl.conf test/a/b/c.c
@@ -30,6 +31,7 @@ if ./tikl -q -c tikl.conf test/robust/check-regex-miss.c ; then exit 1; fi
 if ./tikl -q -L -c tikl.conf test/check-paren.txt ; then exit 1; fi
 ./tikl -q -L -c tikl.conf test/check-paren-escape.txt
 if ./tikl -q -L -c tikl.conf test/check-subst.c ; then exit 1; fi
+if ./tikl -q -L -c tikl.conf test/check-functions.txt ; then exit 1; fi
 ./tikl -q -c tikl.conf test/robust/empty.txt
 ./tikl -q -c tikl.conf test/robust/long-continue.txt
 echo "integration: OK"

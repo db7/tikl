@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include <ctype.h>
 #include <errno.h>
+#include <libgen.h>
 #include <regex.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -141,7 +142,10 @@ static char *strbuf_steal(strbuf *sb)
         sb->len = 0;
         sb->cap = 1;
     }
-    return sb->data;
+    char *out = sb->data;
+    sb->data = NULL;
+    sb->len = sb->cap = 0;
+    return out;
 }
 
 static void strbuf_free(strbuf *sb)
@@ -231,15 +235,107 @@ static const char *lookup_subst(const subst_table *table, const char *key, size_
     return NULL;
 }
 
-static char *apply_placeholders(const char *input, bool lit_compat, const subst_table *subs)
+static char *run_builtin_function(const char *name, const char *arg, int *status)
 {
-    if(lit_compat || subs->n == 0) return xstrdup(input);
+    if(strcmp(name, "basename") == 0) {
+        char *tmp = xstrdup(arg ? arg : "");
+        char *leaf = basename(tmp);
+        char *out = xstrdup(leaf);
+        free(tmp);
+        return out;
+    }
+    if(strcmp(name, "realpath") == 0) {
+        if(!arg || !*arg) arg = ".";
+        char *resolved = realpath(arg, NULL);
+        if(!resolved) {
+            fprintf(stderr, "tikl-check: realpath %s: %s\n", arg, strerror(errno));
+            if(status) *status = 1;
+            return NULL;
+        }
+        return resolved;
+    }
+    fprintf(stderr, "tikl-check: unknown placeholder function: %s\n", name);
+    if(status) *status = 1;
+    return NULL;
+}
+
+static char *apply_placeholders(const char *input, bool lit_compat,
+                                const subst_table *subs, int *status)
+{
+    if(!input) return NULL;
+    if(lit_compat) return xstrdup(input);
     strbuf sb = {0};
-    for(const char *p = input; *p;) {
+    const char *p = input;
+    while(*p) {
+        if(status && *status != 0) {
+            strbuf_free(&sb);
+            return NULL;
+        }
         if(*p == '%') {
             if(p[1] == '%') {
                 strbuf_append_char(&sb, '%');
                 p += 2;
+                continue;
+            }
+            if(p[1] == '(') {
+                const char *start = p + 2;
+                const char *q = start;
+                int depth = 1;
+                while(*q && depth > 0) {
+                    if(*q == '(') depth++;
+                    else if(*q == ')') {
+                        depth--;
+                        if(depth == 0) break;
+                    }
+                    q++;
+                }
+                if(depth != 0) {
+                    fprintf(stderr, "tikl-check: unterminated %%( in pattern: %s\n", input);
+                    if(status) *status = 1;
+                    strbuf_free(&sb);
+                    return NULL;
+                }
+                size_t inner_len = (size_t)(q - start);
+                char *expr = strndup(start, inner_len);
+                if(!expr) die("tikl-check: OOM");
+                char *cursor = expr;
+                while(*cursor && isspace((unsigned char)*cursor)) cursor++;
+                if(!*cursor) {
+                    fprintf(stderr, "tikl-check: empty %%( ) expression\n");
+                    if(status) *status = 1;
+                    free(expr);
+                    strbuf_free(&sb);
+                    return NULL;
+                }
+                char *fname = cursor;
+                while(*cursor && !isspace((unsigned char)*cursor)) cursor++;
+                if(*cursor) *cursor++ = '\0';
+                while(*cursor && isspace((unsigned char)*cursor)) cursor++;
+                char *arg = cursor;
+                char *end = expr + inner_len;
+                while(end > arg && isspace((unsigned char)*(end - 1))) end--;
+                *end = '\0';
+                if(*arg == '\0') {
+                    fprintf(stderr, "tikl-check: missing argument for %s\n", fname);
+                    if(status) *status = 1;
+                    free(expr);
+                    strbuf_free(&sb);
+                    return NULL;
+                }
+                char *arg_expanded = apply_placeholders(arg, lit_compat, subs, status);
+                char *replacement = NULL;
+                if(!status || *status == 0) {
+                    replacement = run_builtin_function(fname, arg_expanded, status);
+                }
+                free(arg_expanded);
+                free(expr);
+                if(!replacement) {
+                    strbuf_free(&sb);
+                    return NULL;
+                }
+                strbuf_append_str(&sb, replacement);
+                free(replacement);
+                p = q + 1;
                 continue;
             }
             size_t len = 0;
@@ -249,14 +345,17 @@ static char *apply_placeholders(const char *input, bool lit_compat, const subst_
                 len++;
                 q++;
             }
-            if(len > 0) {
+            if(len > 0 && subs->n > 0 && !lit_compat) {
                 const char *val = lookup_subst(subs, p + 1, len);
                 if(val) {
                     strbuf_append_str(&sb, val);
-                } else {
-                    strbuf_append_char(&sb, '%');
-                    for(size_t i = 0; i < len; i++) strbuf_append_char(&sb, p[1 + i]);
+                    p = q;
+                    continue;
                 }
+            }
+            if(len > 0) {
+                strbuf_append_char(&sb, '%');
+                for(size_t i = 0; i < len; i++) strbuf_append_char(&sb, p[1 + i]);
                 p = q;
             } else {
                 strbuf_append_char(&sb, '%');
@@ -390,14 +489,16 @@ static void parse_test_file(const char *path, const vecstr *prefixes,
             const char *rest;
             if((rest = match_directive(line, prefixes->v[i], "-NEXT:"))) {
                 const char *pat = trim_leading(rest);
-                char *expanded = apply_placeholders(pat, lit_compat, subs);
-                add_directive(dirs, CHECK_NEXT, state, expanded, lit_compat, status, 0);
+                char *expanded = apply_placeholders(pat, lit_compat, subs, status);
                 matched = true;
+                if(!expanded) continue;
+                add_directive(dirs, CHECK_NEXT, state, expanded, lit_compat, status, 0);
             } else if((rest = match_directive(line, prefixes->v[i], "-SAME:"))) {
                 const char *pat = trim_leading(rest);
-                char *expanded = apply_placeholders(pat, lit_compat, subs);
-                add_directive(dirs, CHECK_SAME, state, expanded, lit_compat, status, 0);
+                char *expanded = apply_placeholders(pat, lit_compat, subs, status);
                 matched = true;
+                if(!expanded) continue;
+                add_directive(dirs, CHECK_SAME, state, expanded, lit_compat, status, 0);
             } else if((rest = match_directive(line, prefixes->v[i], "-EMPTY:"))) {
                 add_directive(dirs, CHECK_EMPTY, state, NULL, lit_compat, status, 0);
                 matched = true;
@@ -424,20 +525,23 @@ static void parse_test_file(const char *path, const vecstr *prefixes,
                     continue;
                 }
                 const char *pat = trim_leading(endptr);
-                char *expanded = apply_placeholders(pat, lit_compat, subs);
+                char *expanded = apply_placeholders(pat, lit_compat, subs, status);
+                matched = true;
+                if(!expanded) continue;
                 add_directive(dirs, CHECK_COUNT, state, expanded, lit_compat, status,
                               (unsigned)count);
-                matched = true;
             } else if((rest = match_directive(line, prefixes->v[i], "-NOT:"))) {
                 const char *pat = trim_leading(rest);
-                char *expanded = apply_placeholders(pat, lit_compat, subs);
-                add_directive(dirs, CHECK_NOT, state, expanded, lit_compat, status, 0);
+                char *expanded = apply_placeholders(pat, lit_compat, subs, status);
                 matched = true;
+                if(!expanded) continue;
+                add_directive(dirs, CHECK_NOT, state, expanded, lit_compat, status, 0);
             } else if((rest = match_directive(line, prefixes->v[i], ":"))) {
                 const char *pat = trim_leading(rest);
-                char *expanded = apply_placeholders(pat, lit_compat, subs);
-                add_directive(dirs, CHECK_FORWARD, state, expanded, lit_compat, status, 0);
+                char *expanded = apply_placeholders(pat, lit_compat, subs, status);
                 matched = true;
+                if(!expanded) continue;
+                add_directive(dirs, CHECK_FORWARD, state, expanded, lit_compat, status, 0);
             }
         }
     }

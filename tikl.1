@@ -132,7 +132,7 @@ accepted prefixes to \fBALT\fR, \fBALT-NEXT\fR, and so on.
 Regex fragments can be embedded inline with \fB{{...}}\fR; surrounding text is
 still matched literally.
 .SH CHECK DIRECTIVES
-The `tikl-check` helper deliberately deviates from LLVM FileCheck in two ways:
+The `tikl-check` helper deliberately deviates from LLVM FileCheck in three ways:
 .IP 1.
 `%placeholder` tokens (from `tikl.conf` or built-ins such as `%s`, `%S`, `%b`,
 and `%B`) are expanded inside every `CHECK` variant. Write `%%name` to keep a
@@ -140,11 +140,15 @@ literal percent sequence.
 .IP 2.
 Literal text outside `{{...}}` regex blocks is treated verbatim, so characters
 like `(` or `)` no longer require escaping.
+.IP 3.
+Inline helper expressions `%(basename ARG)` / `%(realpath ARG)` run inside
+`CHECK` patterns, allowing quick path manipulation without shell glue.
 .PP
-These conveniences speed up day-to-day authoring, but pass `-L` to `tikl` when
-you need strict FileCheck compatibility—both deviations are disabled and regex
-metacharacters regain their default meaning. Regardless of mode you can use
-`--check-prefix` after `%check` to select alternate directive tags.
+These conveniences speed up authoring, but pass `-L` to `tikl` when you need
+strict FileCheck compatibility—every deviation (including the helpers) is
+disabled and regex metacharacters regain their default meaning. Regardless of
+mode you can use `--check-prefix` after `%check` to select alternate directive
+tags.
 .SH EXAMPLES
 .PP
 The snippet below builds a small helper, runs it, and checks the produced
