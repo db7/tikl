@@ -12,14 +12,18 @@ MANDIR?=	${PREFIX}/man/man1
 INSTALL?=	install
 MKDIR_P?=	mkdir -p
 TARGET=		tikl
+CHECK_TARGET=	tikl-check-c
 
-all: ${TARGET}
+all: ${TARGET} ${CHECK_TARGET}
 
 ${TARGET}: tikl.c
 	${CC} ${CFLAGS_} -o ${TARGET} tikl.c
 
+${CHECK_TARGET}: tikl-check.c
+	${CC} ${CFLAGS_} -o ${CHECK_TARGET} tikl-check.c
+
 clean:
-	rm -f ${TARGET} test_unit
+	rm -f ${TARGET} ${CHECK_TARGET} test_unit
 	rm -rf bin
 	${MKDIR_P} bin
 

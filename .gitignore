@@ -1,4 +1,5 @@
 tikl
+tikl-check-c
 test_unit
 bin/
 *.o
