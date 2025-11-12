@@ -14,9 +14,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
+#include "version.h"
 
 typedef struct {
     char **v;
@@ -36,9 +34,6 @@ static const char *bin_root = "bin";
 static const char *const default_scratch_root = "/tmp";
 static const char *scratch_root = "/tmp";
 static unsigned timeout_secs = 0;
-#ifndef TIKL_VERSION
-#define TIKL_VERSION "0.0.0-dev"
-#endif
 static const char tikl_version[] = TIKL_VERSION;
 static bool lit_compat = false;
 

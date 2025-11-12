@@ -1,5 +1,5 @@
 .\" tikl manual
-.TH TIKL 1 "__TIKL_MAN_DATE__" "tikl __TIKL_MAN_VERSION__"
+.TH TIKL 1 "__DATE__" "tikl __VERSION__"
 .SH NAME
 tikl \- tiny lit-inspired tester
 .SH SYNOPSIS

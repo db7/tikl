@@ -1,0 +1,4 @@
+#ifndef TIKL_VERSION_H
+#define TIKL_VERSION_H
+#define TIKL_VERSION "__VERSION__"
+#endif

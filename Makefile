@@ -6,29 +6,35 @@ CFLAGS_=	${CFLAGS}
 CFLAGS_+=	-std=c11 -D_POSIX_C_SOURCE=200809L
 CFLAGS_+=	-Wall -Wextra -Wpedantic -Wshadow -Werror
 
+COV_FLAGS=	-g -O0 --coverage
+
 PREFIX=		/usr/local
 BINDIR=		${PREFIX}/bin
 MANDIR=		${PREFIX}/man/man1
 
-DATE=		$$(date '+%Y-%m-%d' | xargs printf '%s')
-VERSION=	$$(./version.sh)
-CFLAGS_+=	-DTIKL_VERSION=\"${VERSION}\"
-
 TARGETS=	tikl tikl-check tikl.1
 all: ${TARGETS}
 
-clean:
-	rm -f test_unit ${TARGETS}
+coverage: CFLAGS=${COV_FLAGS}
+coverage: clean all test_unit
 
-tikl: tikl.c
+clean:
+	rm -f test_unit ${TARGETS} version.h
+	@find . -name '*.gcov' -exec rm -f {} +
+	@find . -name '*.gcno' -exec rm -f {} +
+	@find . -name '*.gcda' -exec rm -f {} +
+
+tikl: tikl.c version.h
 	${CC} ${CFLAGS_} -o $@ tikl.c
 
-tikl-check: tikl-check.c
+tikl-check: tikl-check.c version.h
 	${CC} ${CFLAGS_} -o $@ tikl-check.c
 
 tikl.1: tikl.1.in
-	sed -e 's/__TIKL_MAN_DATE__/'${DATE}'/' \
-	    -e 's/__TIKL_MAN_VERSION__/'${VERSION}'/' tikl.1.in > $@
+	./versionize.sh tikl.1.in > $@
+
+version.h: version.h.in
+	./versionize.sh version.h.in > $@
 
 install: ${TARGETS}
 	mkdir -p ${DESTDIR}${BINDIR}
@@ -52,4 +58,4 @@ format:
 	@find . -name '*.h' -exec astyle --options=.astylerc {} +
 	@find . -name '*.c' -exec astyle --options=.astylerc {} +
 
-.PHONY: all clean test test_integration selfcheck install format
+.PHONY: all clean coverage test test_integration selfcheck install format

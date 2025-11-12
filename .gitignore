@@ -3,10 +3,13 @@ tikl-check
 test_unit
 bin/
 tikl.1
-VERSION
+version.h
 *.o
 *.orig
 *.dSYM/
+*.gcov
+*.gcno
+*.gcda
 fuzz/out/
 fuzz/build/
 fuzz/*.log
