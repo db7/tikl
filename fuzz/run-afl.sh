@@ -41,29 +41,14 @@ OUT_DIR="$ROOT/fuzz/out"
 SEED_DIR="$ROOT/fuzz/seeds"
 DICT_PATH="$ROOT/fuzz/tikl.dict"
 
-mkdir -p "$BUILD_DIR" "$OUT_DIR" "$SEED_DIR"
+mkdir -p "$OUT_DIR" "$SEED_DIR"
 
-TARGET="$BUILD_DIR/tikl-afl"
-CFLAGS="-std=c11 -D_POSIX_C_SOURCE=200809L -Wall -Wextra -Wpedantic -Wshadow -DTIKL_FUZZ"
+make clean
+make CFLAGS="-g3" CC=afl-gcc
+TARGET=./tikl
 
-# Figure out real compiler to hand to classic AFL wrappers (afl-cc/afl-gcc).
-REAL_CC=""
-if [ -n "${TIKL_REAL_CC:-}" ]; then
-	REAL_CC=$TIKL_REAL_CC
-else
-	case "$AFL_WRAPPER" in
-		*afl-clang* ) REAL_CC=clang ;;
-		afl-cc|afl-gcc) REAL_CC=cc ;;
-	esac
-fi
 
-if [ -n "$REAL_CC" ]; then
-	env AFL_CC="$REAL_CC" "${AFL_WRAPPER}" ${AFL_CFLAGS:-} $CFLAGS -g -O1 -o "$TARGET" tikl.c
-else
-	env -u AFL_CC "${AFL_WRAPPER}" ${AFL_CFLAGS:-} $CFLAGS -g -O1 -o "$TARGET" tikl.c
-fi
-
-set -- afl-fuzz -i "$SEED_DIR" -o "$OUT_DIR"
+set -- afl-fuzz -i "$SEED_DIR" -o "$OUT_DIR" -m 256 -t100
 if [ -f "$DICT_PATH" ]; then
 	set -- "$@" -x "$DICT_PATH"
 fi
