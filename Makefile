@@ -44,7 +44,7 @@ install: ${TARGETS}
 	mkdir -p ${DESTDIR}${MANDIR}
 	install -m 644 tikl.1 ${DESTDIR}${MANDIR}/
 
-test: test_unit test_integration selfcheck
+test: version.h test_unit test_integration selfcheck
 
 test_unit: tikl.c test/unit/test_tikl.c
 	${CC} ${CFLAGS} -o test_unit test/unit/test_tikl.c
