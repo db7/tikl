@@ -510,7 +510,10 @@ match_directive(const char *line, const char *prefix, const char *suffix)
     size_t need = strlen(prefix) + strlen(suffix) + 1;
     if (need > sizeof(needle))
         die("tikl-check: prefix too long");
-    snprintf(needle, sizeof(needle), "%s%s", prefix, suffix);
+    int err = snprintf(needle, sizeof(needle), "%s%s", prefix, suffix);
+    if (err < 0) {
+        abort();
+    }
     const char *pos = strstr(line, needle);
     if (!pos)
         return NULL;

@@ -47,7 +47,7 @@ install: ${TARGETS}
 test: version.h test_unit test_integration selfcheck
 
 test_unit: tikl.c test/unit/test_tikl.c
-	${CC} ${CFLAGS} -o test_unit test/unit/test_tikl.c
+	${CC} ${CFLAGS_} -o test_unit test/unit/test_tikl.c
 
 test_integration: all
 	sh test/run-tests.sh
