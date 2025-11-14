@@ -113,10 +113,12 @@ Pass `-L` to tikl when you need lit-compatible behaviour: `%` tokens are left
 verbatim and regex metacharacters regain their default meaning (so `foo(bar)`
 must be written as `foo\(bar\)`).
 
-Need a different tag? Append options after `%check`, e.g. `| %check --check-prefix=ALT`,
-so only `ALT:` directives are honoured. Use multiple `--check-prefix` flags to match
-several prefixes in one pass, or override `%check` entirely via your own config
-when a different helper better suits your project.
+Need a different tag? Append options after `%check`, e.g. `| %check --check-prefix=ALT`
+or `| %check -p ALT`, so only `ALT:` directives are honoured. Use multiple
+`--check-prefix`/`-p` flags to match several prefixes in one pass, or override
+`%check` entirely via your own config when a different helper better suits your
+project. Add `--print-output-on-fail` (`-x`) to `%check` when you want
+`tikl-check` to dump the checked program's output after any failing directive.
 
 ## Configuration
 

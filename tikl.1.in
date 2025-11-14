@@ -127,10 +127,17 @@ directives. Plain \fBCHECK:\fR patterns must appear in order. \fBCHECK-NEXT:\fR
 advances to the following output line, \fBCHECK-SAME:\fR stays on the current
 line, \fBCHECK-EMPTY:\fR demands a blank line, \fBCHECK-NOT:\fR forbids the
 fragment anywhere, and \fBCHECK-COUNT:\fR enforces an exact occurrence count.
-Passing \fB--check-prefix=ALT\fR (repeatable) after \fB%check\fR switches the
-accepted prefixes to \fBALT\fR, \fBALT-NEXT\fR, and so on.
 Regex fragments can be embedded inline with \fB{{...}}\fR; surrounding text is
 still matched literally.
+.SH CHECK OPTIONS
+.TP
+.B --check-prefix=ALT
+(\fB-p\fR ALT) after \fB%check\fR switches the accepted directive prefixes to
+\fBALT\fR, \fBALT-NEXT\fR, and so on. Repeat the option to accept multiple
+tags in one run.
+.TP
+.B --print-output-on-fail
+(\fB-x\fR) prints the captured program output whenever a directive fails.
 .SH CHECK DIRECTIVES
 The `tikl-check` helper deliberately deviates from LLVM FileCheck in three ways:
 .IP 1.

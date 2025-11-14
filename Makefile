@@ -3,7 +3,8 @@
 CC=		cc
 CFLAGS=		-O2
 CFLAGS_=	${CFLAGS}
-CFLAGS_+=	-std=c11 -D_POSIX_C_SOURCE=200809L
+CFLAGS_+=	-std=c11
+CFLAGS_+=	-D_XOPEN_SOURCE=500
 CFLAGS_+=	-Wall -Wextra -Wpedantic -Wshadow -Werror
 
 COV_FLAGS=	-g -O0 --coverage
