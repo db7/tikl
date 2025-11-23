@@ -870,6 +870,25 @@ run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
         }
     }
 
+    if (runs.n == 0) {
+        if (!quiet) {
+            if (xfail) {
+                const char *sep = (xfail_reason && *xfail_reason) ? "; " : "";
+                const char *msg = (xfail_reason && *xfail_reason) ? xfail_reason : "";
+                fprintf(stderr, "[XFAIL] %s (no RUN directives%s%s)\n", path, sep, msg);
+            } else {
+                fprintf(stderr, "[FAIL] %s (no RUN directives)\n", path);
+            }
+        }
+        vecstr_free(&runs);
+        vecstr_free(&reqs);
+        vecstr_free(&uns);
+        free(xfail_reason);
+        unsetenv("TIKL_CHECK_SUBSTS");
+        unsetenv("TIKL_LIT_COMPAT");
+        return xfail ? 0 : 1;
+    }
+
     int rc = 0;
     bool xfail_hit = false;
     for (size_t i = 0; i < runs.n; i++) {

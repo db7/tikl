@@ -16,8 +16,8 @@ MANDIR=		${PREFIX}/man/man1
 TARGETS=	tikl tikl-check tikl.1
 all: ${TARGETS}
 
-coverage: CFLAGS=${COV_FLAGS}
-coverage: clean all test_unit
+coverage: clean
+	${MAKE} CFLAGS="${COV_FLAGS}" all test_unit
 
 clean:
 	rm -f test_unit ${TARGETS} version.h
@@ -53,7 +53,7 @@ test_integration: all
 	sh test/run-tests.sh
 
 selfcheck: all
-	./tikl -q -c tikl.conf test/self
+	./tikl -q -c tikl.conf test/self/*.txt
 
 format:
 	@find . -name '*.h' -exec astyle --options=.astylerc {} +

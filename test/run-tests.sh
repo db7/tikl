@@ -28,10 +28,11 @@ if ./tikl -q -c tikl.conf test/robust/allow-retries-exhaust.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/xfail-xpass.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/check-prefix-miss.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/check-regex-miss.c ; then exit 1; fi
+if ./tikl -q -c tikl.conf test/robust/missing-run.c ; then exit 1; fi
 if ./tikl -q -L -c tikl.conf test/check-paren.txt ; then exit 1; fi
 ./tikl -q -L -c tikl.conf test/check-paren-escape.txt
 if ./tikl -q -L -c tikl.conf test/check-subst.c ; then exit 1; fi
 if ./tikl -q -L -c tikl.conf test/check-functions.txt ; then exit 1; fi
-./tikl -q -c tikl.conf test/robust/empty.txt
+if ./tikl -q -c tikl.conf test/robust/empty.txt ; then exit 1; fi
 ./tikl -q -c tikl.conf test/robust/long-continue.txt
 echo "integration: OK"
