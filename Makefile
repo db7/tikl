@@ -13,7 +13,7 @@ PREFIX=		/usr/local
 BINDIR=		${PREFIX}/bin
 MANDIR=		${PREFIX}/man/man1
 
-TARGETS=	tikl tikl-check tikl.1
+TARGETS=	tikl tikl-check tikl.1 tikl-check.1
 all: ${TARGETS}
 
 coverage: clean
@@ -25,14 +25,17 @@ clean:
 	@find . -name '*.gcno' -exec rm -f {} +
 	@find . -name '*.gcda' -exec rm -f {} +
 
-tikl: tikl.c version.h
-	${CC} ${CFLAGS_} -o $@ tikl.c
+tikl: tikl.c subst.c version.h
+	${CC} ${CFLAGS_} -o $@ tikl.c subst.c
 
-tikl-check: tikl-check.c version.h
-	${CC} ${CFLAGS_} -o $@ tikl-check.c
+tikl-check: tikl-check.c subst.c version.h
+	${CC} ${CFLAGS_} -o $@ tikl-check.c subst.c
 
 tikl.1: tikl.1.in
 	./versionize.sh tikl.1.in > $@
+
+tikl-check.1: tikl-check.1.in
+	./versionize.sh tikl-check.1.in > $@
 
 version.h: version.h.in
 	./versionize.sh version.h.in > $@
@@ -43,11 +46,12 @@ install: ${TARGETS}
 	install -m 755 tikl-check ${DESTDIR}${BINDIR}/
 	mkdir -p ${DESTDIR}${MANDIR}
 	install -m 644 tikl.1 ${DESTDIR}${MANDIR}/
+	install -m 644 tikl-check.1 ${DESTDIR}${MANDIR}/
 
 test: version.h test_unit test_integration selfcheck
 
-test_unit: tikl.c test/unit/test_tikl.c
-	${CC} ${CFLAGS_} -o test_unit test/unit/test_tikl.c
+test_unit: tikl.c subst.c test/unit/test_tikl.c
+	${CC} ${CFLAGS_} -o test_unit test/unit/test_tikl.c subst.c
 
 test_integration: all
 	sh test/run-tests.sh

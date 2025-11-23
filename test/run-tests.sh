@@ -13,6 +13,7 @@ set -eu
 ./tikl -q -c tikl.conf test/check-functions.txt
 ./tikl -q -c tikl.conf test/check-paren.txt
 ./tikl -q -c tikl.conf test/check-paren-escape.txt
+./tikl -q -c tikl.conf test/run-placeholder-helpers.txt
 ./tikl -q -c tikl.conf test/a/b/c.c
 ./tikl -q -c tikl.conf test/allow-retries.c
 ./tikl -q -c tikl.conf test/xfail.c

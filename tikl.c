@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 #include "version.h"
+#include "subst.h"
 
 typedef struct {
     char **v;
@@ -158,6 +159,53 @@ mapkv_free(mapkv *m)
         free(m->v[i].val);
     }
     free(m->v);
+}
+
+static const char *
+lookup_mapkv_cb(void *ctx, const char *key, size_t len)
+{
+    mapkv *m = ctx;
+    if (!m)
+        return NULL;
+    for (size_t i = 0; i < m->n; i++) {
+        if (strlen(m->v[i].key) == len &&
+            strncmp(m->v[i].key, key, len) == 0)
+            return m->v[i].val;
+    }
+    return NULL;
+}
+
+typedef struct {
+    const char *s;
+    const char *S;
+    const char *t;
+    const char *T;
+    const char *b;
+    const char *B;
+} builtin_substs;
+
+static const char *
+lookup_builtin_cb(void *ctx, const char *key, size_t len)
+{
+    builtin_substs *b = ctx;
+    if (!b || len != 1)
+        return NULL;
+    switch (key[0]) {
+        case 's':
+            return b->s;
+        case 'S':
+            return b->S;
+        case 't':
+            return b->t;
+        case 'T':
+            return b->T;
+        case 'b':
+            return b->b;
+        case 'B':
+            return b->B;
+        default:
+            return NULL;
+    }
 }
 
 static bool
@@ -322,65 +370,28 @@ parse_config(const char *path, mapkv *subs)
 }
 
 static char *
-subst_once(const char *in, const char *sym, const char *val)
-{
-    char needle[128];
-    snprintf(needle, sizeof(needle), "%%%s", sym);
-    size_t kne = strlen(needle);
-    size_t nin = strlen(in), nval = strlen(val);
-    size_t cap = nin + 1 + (nval + 1) * 8;
-    char *out = malloc(cap);
-    if (!out)
-        die("OOM");
-    const char *p = in;
-    char *q = out;
-    while (*p) {
-        if (strncmp(p, needle, kne) == 0) {
-            size_t need = (size_t)(q - out) + nval + 1;
-            if (need > cap) {
-                cap = need * 2;
-                size_t off = (size_t)(q - out);
-                out = realloc(out, cap);
-                if (!out)
-                    die("OOM");
-                q = out + off;
-            }
-            memcpy(q, val, nval);
-            q += nval;
-            p += kne;
-        } else {
-            if ((size_t)(q - out) + 2 > cap) {
-                cap *= 2;
-                size_t off = (size_t)(q - out);
-                out = realloc(out, cap);
-                if (!out)
-                    die("OOM");
-                q = out + off;
-            }
-            *q++ = *p++;
-        }
-    }
-    *q = '\0';
-    return out;
-}
-
-static char *
 apply_config_substitutions(const char *input, mapkv *subs)
 {
-    char *cmd = xstrdup(input);
+    char *current = xstrdup(input);
     for (int pass = 0; pass < 8; pass++) {
-        bool changed = false;
-        for (size_t i = 0; i < subs->n; i++) {
-            char *next = subst_once(cmd, subs->v[i].key, subs->v[i].val);
-            if (strcmp(next, cmd) != 0)
-                changed = true;
-            free(cmd);
-            cmd = next;
+        int status = 0;
+        char *next = tikl_expand_placeholders(current, true, false,
+                                              lookup_mapkv_cb, subs,
+                                              "tikl", &status);
+        if (status != 0) {
+            free(current);
+            free(next);
+            die("invalid placeholder in configuration");
         }
+        if (!next)
+            return current;
+        bool changed = strcmp(current, next) != 0;
+        free(current);
+        current = next;
         if (!changed)
             break;
     }
-    return cmd;
+    return current;
 }
 
 static char *
@@ -430,32 +441,31 @@ perform_substitutions(const char *cmd_in, mapkv *subs,
 
     char *cmd = apply_config_substitutions(cmd_in, subs);
 
-    char *x;
-    const char *scratch_for_T = tdir ? tdir : ((scratch_root
-                                && *scratch_root) ? scratch_root : default_scratch_root);
-
+    const char *scratch_for_T = tdir ? tdir : ((scratch_root &&
+                                                *scratch_root) ? scratch_root :
+                                               default_scratch_root);
     const char *path_for_s = testpath_abs ? testpath_abs : testpath;
-    x = subst_once(cmd, "s", path_for_s);
-    free(cmd);
-    cmd = x;
-    x = subst_once(cmd, "S", s_dir);
-    free(cmd);
-    cmd = x;
-    x = subst_once(cmd, "t", tfile);
-    free(cmd);
-    cmd = x;
-    x = subst_once(cmd, "T", scratch_for_T);
-    free(cmd);
-    cmd = x;
-    x = subst_once(cmd, "b", bmap);
-    free(cmd);
-    cmd = x;
-    x = subst_once(cmd, "B", bdir);
-    free(cmd);
-    cmd = x;
 
+    builtin_substs builtins = {
+        .s = path_for_s,
+        .S = s_dir,
+        .t = tfile,
+        .T = scratch_for_T,
+        .b = bmap,
+        .B = bdir,
+    };
+
+    int status = 0;
+    char *expanded = tikl_expand_placeholders(cmd, true, true,
+                                              lookup_builtin_cb, &builtins,
+                                              "tikl", &status);
+    free(cmd);
     free(tdir);
-    return cmd;
+    if (status != 0) {
+        free(expanded);
+        die("invalid placeholder expansion");
+    }
+    return expanded;
 }
 
 static void
@@ -481,19 +491,22 @@ expand_for_check_value(const char *input, mapkv *subs,
                        const char *bdir)
 {
     char *cmd = apply_config_substitutions(input, subs);
-    char *x = subst_once(cmd, "s", path_for_s);
+    builtin_substs builtins = {
+        .s = path_for_s,
+        .S = s_dir,
+        .b = bmap,
+        .B = bdir,
+    };
+    int status = 0;
+    char *out = tikl_expand_placeholders(cmd, true, true,
+                                         lookup_builtin_cb, &builtins,
+                                         "tikl", &status);
     free(cmd);
-    cmd = x;
-    x = subst_once(cmd, "S", s_dir);
-    free(cmd);
-    cmd = x;
-    x = subst_once(cmd, "b", bmap);
-    free(cmd);
-    cmd = x;
-    x = subst_once(cmd, "B", bdir);
-    free(cmd);
-    cmd = x;
-    return cmd;
+    if (status != 0) {
+        free(out);
+        die("invalid placeholder in configuration");
+    }
+    return out;
 }
 
 static char *

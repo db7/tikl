@@ -58,7 +58,7 @@ output or `-v` to echo the shell commands as they run.
 ### `%check` in action
 
 A typical test pairs a `RUN:` directive with `%check` so the helper script can
-verify a file’s contents:
+verify a file's contents:
 
 ```c
 // RUN: %cc %s -o %b
@@ -93,10 +93,12 @@ Supported directives:
 - `CHECK-COUNT: N foo` requires `foo` to be seen exactly `N` times.
 - Embed regular expressions inline with `{{...}}`; surrounding text is matched
   literally, so `CHECK: value={{[0-9]+}}` accepts `value=123`.
-- Use inline helper calls to transform placeholders: `%(basename ARG)` strips a
-  path down to its filename and `%(realpath ARG)` resolves symlinks. Arguments
-  can contain other placeholders or helper calls. These helpers are only active
-  when tikl is running in its default (non-`-L`) mode.
+- Use inline helper calls anywhere tikl performs substitutions—`RUN:` commands,
+  config values, and `CHECK` directives: `%(basename ARG)` strips a path down to
+  its filename, `%(dirname ARG)` returns the containing directory, and
+  `%(realpath ARG)` resolves symlinks. Arguments can contain other placeholders
+  or helper calls. These helpers are only active when tikl is running in its
+  default (non-`-L`) mode.
 
 tikl deliberately diverges from LLVM's FileCheck/lit in two ways:
 
@@ -105,9 +107,9 @@ tikl deliberately diverges from LLVM's FileCheck/lit in two ways:
    `%s`, `%S`, `%b`, and `%B`. Use `%%name` to keep the literal text `%name`.
 2. Literal text outside `{{...}}` is treated as literal text, so parentheses and
    other regex metacharacters do not need escaping.
-3. Inline helper expressions `%(basename ARG)` / `%(realpath ARG)` run inside
-   `CHECK` patterns, allowing quick path manipulation without touching the
-   surrounding shell script.
+3. Inline helper expressions `%(basename ARG)` / `%(dirname ARG)` /
+   `%(realpath ARG)` run inside `CHECK` patterns, allowing quick path
+   manipulation without touching the surrounding shell script.
 
 Pass `-L` to tikl when you need lit-compatible behaviour: `%` tokens are left
 verbatim and regex metacharacters regain their default meaning (so `foo(bar)`

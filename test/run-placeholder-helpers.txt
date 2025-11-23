@@ -1,0 +1,4 @@
+# RUN: printf 'BASE=%(basename %s)\nDIR=%(realpath %S)\nDIRNAME=%(dirname %s)\n' | %check
+# CHECK: BASE=%(basename %s)
+# CHECK: DIR=%(realpath %S)
+# CHECK: DIRNAME=%(dirname %s)

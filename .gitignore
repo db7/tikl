@@ -3,6 +3,7 @@ tikl-check
 test_unit
 bin/
 tikl.1
+tikl-check.1
 version.h
 *.o
 *.orig

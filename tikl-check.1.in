@@ -1,0 +1,118 @@
+.\" tikl-check manual
+.TH TIKL-CHECK 1 "__DATE__" "tikl __VERSION__"
+.SH NAME
+tikl-check \- FileCheck-style verifier used by tikl
+.SH SYNOPSIS
+.B tikl-check
+[\-\-check-prefix=\fIname\fR | \-p \fIname\fR] ...
+[\-\-print-output-on-fail | \-x]
+[\-\-]
+\fItest-file\fR < program-output
+.SH DESCRIPTION
+.B tikl-check
+parses the \fBCHECK\fR directives embedded in a test source file and validates
+that the lines fed on standard input satisfy them. It mirrors the directive
+language understood by LLVM's FileCheck but keeps a small, self-contained
+implementation tailored for \fBtikl\fR test suites. Literal text is matched
+verbatim (regex metacharacters only gain special meaning inside \fB{{...}}\fR
+blocks) and tikl-style \fB%placeholder\fR tokens are expanded directly inside
+patterns unless lit-compatibility mode is requested.
+.PP
+The usual workflow is to pipe your program's stdout/stderr into \fBtikl-check\fR
+while pointing it at the original test file. Running under \fBtikl\fR happens
+automatically via the built-in \fB%check\fR placeholder, but invoking the tool
+manually can help when iterating on directives or debugging failing cases.
+.SH OPTIONS
+.TP
+.BR \-\-check-prefix =\fIname\fR ", " \-\-check-prefix " " \fIname\fR ", " \-p \fIname\fR
+Accept directives that start with \fIname\fR (e.g. \fBFOO:\fR, \fBFOO-NEXT:\fR).
+Repeat the option to allow multiple tags. When omitted, the default prefix is
+\fBCHECK\fR.
+.TP
+.BR \-\-print-output-on-fail ", " \-x
+Dump the entire captured program output whenever a directive mismatch occurs.
+.TP
+.BR \-\-help ", " \-h
+Print usage information and exit.
+.TP
+.B \-\-
+Stop option parsing; the following argument is treated as the test file path
+even if it begins with a dash.
+.SH DIRECTIVES
+.TP
+.B CHECK:
+Search forward from the previous successful match (or the start of the log) for
+a line matching the pattern. Literal text is compared verbatim; embed regular
+expressions inside \fB{{...}}\fR.
+.TP
+.B CHECK-NEXT:
+Require the next line after the last match to satisfy the pattern.
+.TP
+.B CHECK-SAME:
+Re-match the line that satisfied the preceding directive.
+.TP
+.B CHECK-EMPTY:
+Insist that the following line is blank; no pattern text is taken.
+.TP
+.B CHECK-NOT:
+Ensure the pattern never appears in any input line.
+.TP
+.B CHECK-COUNT: \fIN\fR \fIpattern\fR
+Require the pattern to match exactly \fIN\fR distinct lines. After the count,
+the rest of the directive is parsed like a regular \fBCHECK:\fR.
+.PP
+Each prefix (default \fBCHECK\fR) tracks its own last-matched line so different
+tag families can interleave independently.
+.SH PLACEHOLDER EXPANSION
+Unless lit-compatibility mode is active, placeholder words inside patterns are
+expanded before regex compilation:
+.TP
+.B %name
+Replaced with the value supplied for \fBname\fR in the substitution table
+provided by tikl. Use \fB%%\fR to emit a literal percent sign.
+.TP
+.B %(func ARG)
+Runs a helper function on \fBARG\fR and inlines the result. The built-ins are
+\fB%(basename path)\fR, \fB%(dirname path)\fR, and \fB%(realpath path)\fR.
+.PP
+Set by tikl, the \fBTIKL_CHECK_SUBSTS\fR environment variable holds newline
+separated \fIname\fR=\fIvalue\fR entries that feed the lookup table when the
+helper runs standalone.
+.SH ENVIRONMENT
+.TP
+.B TIKL_CHECK_SUBSTS
+Optional newline-delimited \fIkey\fR=\fIvalue\fR entries that populate the
+placeholder map. tikl populates this automatically from \fBtikl.conf\fR and
+built-in substitutions.
+.TP
+.B TIKL_LIT_COMPAT
+When set to a non-zero value, disables placeholder expansion and treats literal
+segments in patterns as true regular expressions, matching LLVM FileCheck's
+behaviour. tikl exports this when invoked with \fB-L\fR.
+.SH EXIT STATUS
+Zero indicates that every enabled directive succeeded. Failure to parse the test
+file, read stdin, or satisfy a directive yields a non-zero status (2 on usage or
+syntax errors).
+.SH EXAMPLES
+.PP
+Compile a helper program, pipe its output into tikl-check, and validate the
+stream using prefixes \fBEXP\fR and \fBERR\fR:
+.PP
+.nf
+    $ cc sample.c -o sample
+    $ ./sample | tikl-check --check-prefix=EXP --check-prefix=ERR sample.c
+.fi
+.PP
+Within tikl tests the helper is commonly referenced via \fB%check\fR:
+.PP
+.nf
+    // RUN: %cc %s -o %b
+    // RUN: %b | %check --print-output-on-fail
+    // CHECK: initializing subsystem
+    // CHECK-NEXT: done
+.fi
+.SH SEE ALSO
+.BR tikl (1),
+LLVM lit documentation:
+.UR https://llvm.org/docs/CommandGuide/FileCheck.html
+.UE
