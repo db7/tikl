@@ -94,8 +94,9 @@ Supported directives:
 - Embed regular expressions inline with `{{...}}`; surrounding text is matched
   literally, so `CHECK: value={{[0-9]+}}` accepts `value=123`.
 - Use inline helper calls anywhere tikl performs substitutions—`RUN:` commands,
-  config values, and `CHECK` directives: `%(basename ARG)` strips a path down to
-  its filename, `%(dirname ARG)` returns the containing directory, and
+  config values, and `CHECK` directives: `%(basename ARG [SUFFIX])` strips a
+  path down to its filename (optionally removing a trailing `SUFFIX` just like
+  the shell command), `%(dirname ARG)` returns the containing directory, and
   `%(realpath ARG)` resolves symlinks. Arguments can contain other placeholders
   or helper calls. These helpers are only active when tikl is running in its
   default (non-`-L`) mode.
@@ -107,7 +108,7 @@ tikl deliberately diverges from LLVM's FileCheck/lit in two ways:
    `%s`, `%S`, `%b`, and `%B`. Use `%%name` to keep the literal text `%name`.
 2. Literal text outside `{{...}}` is treated as literal text, so parentheses and
    other regex metacharacters do not need escaping.
-3. Inline helper expressions `%(basename ARG)` / `%(dirname ARG)` /
+3. Inline helper expressions `%(basename ARG [SUFFIX])` / `%(dirname ARG)` /
    `%(realpath ARG)` run inside `CHECK` patterns, allowing quick path
    manipulation without touching the surrounding shell script.
 

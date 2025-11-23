@@ -83,14 +83,118 @@ sb_free(subst_strbuf *sb)
     sb->len = sb->cap = 0;
 }
 
+static void
+skip_ws(const char **cursor)
+{
+    if (!cursor)
+        return;
+    const char *p = *cursor;
+    while (p && *p && isspace((unsigned char)*p))
+        p++;
+    *cursor = p;
+}
+
+static char *
+parse_helper_token(const char *who, const char **cursor, bool *error)
+{
+    const char *p = cursor ? *cursor : NULL;
+    if (!p)
+        return NULL;
+    skip_ws(&p);
+    if (!*p) {
+        *cursor = p;
+        return NULL;
+    }
+    subst_strbuf sb = {0};
+    char quote = '\0';
+    while (*p) {
+        if (!quote && isspace((unsigned char)*p))
+            break;
+        if (!quote && (*p == '\'' || *p == '"')) {
+            quote = *p++;
+            continue;
+        }
+        if (quote && *p == quote) {
+            quote = '\0';
+            p++;
+            continue;
+        }
+        if (*p == '\\' && quote != '\'') {
+            p++;
+            if (*p) {
+                sb_append_char(who, &sb, *p++);
+            } else {
+                sb_append_char(who, &sb, '\\');
+            }
+            continue;
+        }
+        sb_append_char(who, &sb, *p++);
+    }
+    if (quote) {
+        if (error)
+            *error = true;
+        sb_free(&sb);
+        return NULL;
+    }
+    char *out = sb_steal(&sb);
+    *cursor = p;
+    return out;
+}
+
 static char *
 run_builtin_function(const char *who, const char *name, const char *arg, int *status)
 {
     if (strcmp(name, "basename") == 0) {
-        char *tmp = subst_xstrdup(who, arg ? arg : "");
+        bool parse_error = false;
+        const char *cursor = arg ? arg : "";
+        char *path = parse_helper_token(who, &cursor, &parse_error);
+        if (parse_error || !path) {
+            fprintf(stderr, "%s: invalid argument for %%(basename)\n",
+                    who ? who : "tikl");
+            if (status)
+                *status = 1;
+            free(path);
+            return NULL;
+        }
+        skip_ws(&cursor);
+        char *suffix = NULL;
+        if (*cursor) {
+            suffix = parse_helper_token(who, &cursor, &parse_error);
+            if (parse_error) {
+                fprintf(stderr, "%s: invalid suffix for %%(basename)\n",
+                        who ? who : "tikl");
+                if (status)
+                    *status = 1;
+                free(path);
+                free(suffix);
+                return NULL;
+            }
+        }
+        skip_ws(&cursor);
+        if (*cursor) {
+            fprintf(stderr, "%s: %%(basename) accepts at most two arguments\n",
+                    who ? who : "tikl");
+            if (status)
+                *status = 1;
+            free(path);
+            free(suffix);
+            return NULL;
+        }
+        char *tmp = path;
         char *leaf = basename(tmp);
-        char *out = subst_xstrdup(who, leaf);
-        free(tmp);
+        if (suffix && *suffix) {
+            size_t leaf_len = leaf ? strlen(leaf) : 0;
+            size_t suffix_len = strlen(suffix);
+            if (leaf_len >= suffix_len &&
+                suffix_len > 0 &&
+                leaf_len > 0 &&
+                memcmp(leaf + leaf_len - suffix_len, suffix, suffix_len) == 0) {
+                leaf[leaf_len - suffix_len] = '\0';
+            }
+        }
+        char *out = subst_xstrdup(who, leaf ? leaf : "");
+        free(path);
+        free(suffix);
         return out;
     }
     if (strcmp(name, "realpath") == 0) {

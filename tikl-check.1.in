@@ -73,7 +73,8 @@ provided by tikl. Use \fB%%\fR to emit a literal percent sign.
 .TP
 .B %(func ARG)
 Runs a helper function on \fBARG\fR and inlines the result. The built-ins are
-\fB%(basename path)\fR, \fB%(dirname path)\fR, and \fB%(realpath path)\fR.
+\fB%(basename path [suffix])\fR, \fB%(dirname path)\fR, and
+\fB%(realpath path)\fR.
 .PP
 Set by tikl, the \fBTIKL_CHECK_SUBSTS\fR environment variable holds newline
 separated \fIname\fR=\fIvalue\fR entries that feed the lookup table when the

@@ -129,8 +129,8 @@ line, \fBCHECK-EMPTY:\fR demands a blank line, \fBCHECK-NOT:\fR forbids the
 fragment anywhere, and \fBCHECK-COUNT:\fR enforces an exact occurrence count.
 Regex fragments can be embedded inline with \fB{{...}}\fR; surrounding text is
 still matched literally.
-Inline helper expressions \fB%(basename ARG)\fR / \fB%(dirname ARG)\fR /
-\fB%(realpath ARG)\fR expand anywhere tikl performs substitutions: inside
+Inline helper expressions \fB%(basename ARG [SUFFIX])\fR / \fB%(dirname ARG)\fR
+/ \fB%(realpath ARG)\fR expand anywhere tikl performs substitutions: inside
 \fBRUN:\fR commands, config values, and \fBCHECK\fR directives. Pass \fB-L\fR to
 disable these helpers for strict FileCheck compatibility.
 .SH CHECK OPTIONS
@@ -152,7 +152,7 @@ literal percent sequence.
 Literal text outside `{{...}}` regex blocks is treated verbatim, so characters
 like `(` or `)` no longer require escaping.
 .IP 3.
-Inline helper expressions `%(basename ARG)` / `%(dirname ARG)` /
+Inline helper expressions `%(basename ARG [SUFFIX])` / `%(dirname ARG)` /
 `%(realpath ARG)` are resolved before compiling the regex, matching the
 behaviour used for \fBRUN:\fR command substitutions.
 .PP

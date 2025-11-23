@@ -1,4 +1,5 @@
-# RUN: printf 'BASE=%(basename %s)\nDIR=%(realpath %S)\nDIRNAME=%(dirname %s)\n' | %check
+# RUN: printf 'BASE=%(basename %s)\nBASE_STRIPPED=%(basename %s .txt)\nDIR=%(realpath %S)\nDIRNAME=%(dirname %s)\n' | %check
 # CHECK: BASE=%(basename %s)
+# CHECK: BASE_STRIPPED=run-placeholder-helpers
 # CHECK: DIR=%(realpath %S)
 # CHECK: DIRNAME=%(dirname %s)
