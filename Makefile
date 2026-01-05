@@ -32,13 +32,13 @@ tikl-check: tikl-check.c subst.c version.h
 	${CC} ${CFLAGS_} -o $@ tikl-check.c subst.c
 
 tikl.1: tikl.1.in
-	./versionize.sh tikl.1.in > $@
+	./versionize.sh -r tikl.1.in > $@
 
 tikl-check.1: tikl-check.1.in
-	./versionize.sh tikl-check.1.in > $@
+	./versionize.sh -r tikl-check.1.in > $@
 
 version.h: version.h.in
-	./versionize.sh version.h.in > $@
+	./versionize.sh -r version.h.in > $@
 
 install: ${TARGETS}
 	mkdir -p ${DESTDIR}${BINDIR}
