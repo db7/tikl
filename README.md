@@ -20,6 +20,8 @@ easy to hack on.
   artefacts to a custom tree.
 - Feature flags (`-D feature`) gate tests via `REQUIRES`/`UNSUPPORTED`, which
   keeps suites portable across different hosts.
+- In default mode, tikl enables `pipefail` when the host shell supports it, so
+  `RUN:` pipelines fail if any stage fails.
 - Zero dependencies beyond a POSIX-ish `sh`, so it travels well across systems.
 
 ## Building

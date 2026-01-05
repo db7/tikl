@@ -588,7 +588,17 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
         return 127;
     }
     if (pid == 0) {
-        execl("/bin/sh", "sh", "-c", cmd, (char*)0);
+        if (lit_compat) {
+            execl("/bin/sh", "sh", "-c", cmd, (char*)0);
+            _exit(127);
+        }
+        const char *pipefail_prelude = "set -o pipefail 2>/dev/null || :; ";
+        size_t want = strlen(pipefail_prelude) + strlen(cmd) + 1;
+        char *script = malloc(want);
+        if (!script)
+            _exit(127);
+        snprintf(script, want, "%s%s", pipefail_prelude, cmd);
+        execl("/bin/sh", "sh", "-c", script, (char*)0);
         _exit(127);
     }
     int st = 0;

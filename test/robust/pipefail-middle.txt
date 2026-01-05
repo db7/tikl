@@ -1,0 +1,3 @@
+# RUN: printf 'x\n' | grep y | tee %t
+# RUN: echo SHOULD_NOT_RUN_PIPEFAIL
+

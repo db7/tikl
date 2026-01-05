@@ -80,6 +80,9 @@ tikl recognises the following case-sensitive directives inside line comments:
 .TP
 \fBRUN:\fR command
 Collects the shell \fIcommand\fR to execute for the current test.
+Commands run under \fB/bin/sh -c\fR. In the default (non-\fB-L\fR) mode, tikl
+attempts to enable \fBpipefail\fR when the host shell supports it, so a pipeline
+fails when any stage fails.
 .TP
 \fBREQUIRES:\fR feature[, feature...]
 Skips the test unless every listed feature is supplied with \fB-D\fR.

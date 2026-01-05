@@ -1,0 +1,8 @@
+# RUN: { ./tikl -v -c tikl.conf test/robust/stop-on-fail.txt; echo RC=$?; } 2>&1 | %check
+# CHECK: [ RUN ] test/robust/stop-on-fail.txt
+# CHECK: $ echo before
+# CHECK: $ false
+# CHECK: [FAIL] test/robust/stop-on-fail.txt (step 2 exit 1)
+# CHECK-NOT: echo after
+# CHECK: RC=1
+
