@@ -667,7 +667,7 @@ probe_pipefail(const char *shell_path)
     if (pid < 0)
         return false;
     if (pid == 0) {
-        execl(shell_path, shell_path, "-c", "set -o pipefail", (char *)0);
+        execl(shell_path, shell_path, "-c", "set -o pipefail 2>/dev/null", (char *)0);
         _exit(127);
     }
     int st = 0;
