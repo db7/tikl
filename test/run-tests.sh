@@ -33,6 +33,9 @@ if ./tikl -q -c tikl.conf test/robust/missing-run.c ; then exit 1; fi
 if [ -x /bin/sh ] && /bin/sh -c 'set -o pipefail' 2>/dev/null; then
     if ./tikl -q -c tikl.conf test/robust/pipefail-middle.txt ; then exit 1; fi
     if ./tikl -v -c tikl.conf test/robust/pipefail-middle.txt 2>&1 | grep -F "SHOULD_NOT_RUN_PIPEFAIL" >/dev/null; then exit 1; fi
+elif [ -x /bin/bash ] && /bin/bash -c 'set -o pipefail' 2>/dev/null; then
+    if ./tikl -q -c tikl.conf test/robust/pipefail-middle.txt ; then exit 1; fi
+    if ./tikl -v -c tikl.conf test/robust/pipefail-middle.txt 2>&1 | grep -F "SHOULD_NOT_RUN_PIPEFAIL" >/dev/null; then exit 1; fi
 fi
 if ./tikl -q -L -c tikl.conf test/check-paren.txt ; then exit 1; fi
 ./tikl -q -L -c tikl.conf test/check-paren-escape.txt

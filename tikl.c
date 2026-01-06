@@ -37,6 +37,8 @@ static const char *scratch_root = "/tmp";
 static unsigned timeout_secs = 0;
 static const char tikl_version[] = TIKL_VERSION;
 static bool lit_compat = false;
+static const char *run_shell_path = "/bin/sh";
+static bool run_shell_has_pipefail = false;
 
 static void
 die(const char *fmt, ...)
@@ -577,6 +579,17 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
 #else
     if (timed_out)
         *timed_out = false;
+    const char *script = cmd;
+    char *wrapped = NULL;
+    if (!lit_compat && run_shell_has_pipefail) {
+        const char *pipefail_prelude = "set -o pipefail 2>/dev/null || :; ";
+        size_t want = strlen(pipefail_prelude) + strlen(cmd) + 1;
+        wrapped = malloc(want);
+        if (!wrapped)
+            return 127;
+        snprintf(wrapped, want, "%s%s", pipefail_prelude, cmd);
+        script = wrapped;
+    }
     if (verbose) {
         fputs("    $ ", stderr);
         fputs(cmd, stderr);
@@ -585,20 +598,11 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
     pid_t pid = fork();
     if (pid < 0) {
         perror("fork");
+        free(wrapped);
         return 127;
     }
     if (pid == 0) {
-        if (lit_compat) {
-            execl("/bin/sh", "sh", "-c", cmd, (char*)0);
-            _exit(127);
-        }
-        const char *pipefail_prelude = "set -o pipefail 2>/dev/null || :; ";
-        size_t want = strlen(pipefail_prelude) + strlen(cmd) + 1;
-        char *script = malloc(want);
-        if (!script)
-            _exit(127);
-        snprintf(script, want, "%s%s", pipefail_prelude, cmd);
-        execl("/bin/sh", "sh", "-c", script, (char*)0);
+        execl(run_shell_path, run_shell_path, "-c", script, (char*)0);
         _exit(127);
     }
     int st = 0;
@@ -608,6 +612,7 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
             if (errno == EINTR)
                 continue;
             perror("waitpid");
+            free(wrapped);
             return 127;
         }
     } else {
@@ -620,6 +625,7 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
                 if (errno == EINTR)
                     continue;
                 perror("waitpid");
+                free(wrapped);
                 return 127;
             }
             if (remaining == 0) {
@@ -631,6 +637,7 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
                 }
                 if (timed_out)
                     *timed_out = true;
+                free(wrapped);
                 return 124;
             }
             sleep(1);
@@ -639,11 +646,56 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
         }
     }
     if (WIFEXITED(st))
-        return WEXITSTATUS(st);
-    if (WIFSIGNALED(st))
-        return 128 + WTERMSIG(st);
-    return 127;
+        st = WEXITSTATUS(st);
+    else if (WIFSIGNALED(st))
+        st = 128 + WTERMSIG(st);
+    else
+        st = 127;
+    free(wrapped);
+    return st;
 #endif
+}
+
+static bool
+probe_pipefail(const char *shell_path)
+{
+#ifdef TIKL_FUZZ
+    (void)shell_path;
+    return true;
+#else
+    pid_t pid = fork();
+    if (pid < 0)
+        return false;
+    if (pid == 0) {
+        execl(shell_path, shell_path, "-c", "set -o pipefail", (char *)0);
+        _exit(127);
+    }
+    int st = 0;
+    while (waitpid(pid, &st, 0) < 0) {
+        if (errno == EINTR)
+            continue;
+        return false;
+    }
+    return WIFEXITED(st) && WEXITSTATUS(st) == 0;
+#endif
+}
+
+static void
+init_run_shell(void)
+{
+    run_shell_path = "/bin/sh";
+    run_shell_has_pipefail = false;
+    if (lit_compat)
+        return;
+    if (probe_pipefail("/bin/sh")) {
+        run_shell_has_pipefail = true;
+        return;
+    }
+    if (access("/bin/bash", X_OK) == 0 && probe_pipefail("/bin/bash")) {
+        run_shell_path = "/bin/bash";
+        run_shell_has_pipefail = true;
+        return;
+    }
 }
 
 static bool
@@ -1082,6 +1134,8 @@ main(int argc, char **argv)
     vecstr_push(&features, "check");
     if (cfgpath)
         parse_config(cfgpath, &subs);
+
+    init_run_shell();
 
     int overall_rc = 0;
     for (int i = optind; i < argc; i++) {
