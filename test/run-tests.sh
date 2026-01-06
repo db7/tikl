@@ -30,7 +30,7 @@ if ./tikl -q -c tikl.conf test/robust/xfail-xpass.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/check-prefix-miss.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/check-regex-miss.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/missing-run.c ; then exit 1; fi
-if sh -c 'set -o pipefail' 2>/dev/null; then
+if [ -x /bin/sh ] && /bin/sh -c 'set -o pipefail' 2>/dev/null; then
     if ./tikl -q -c tikl.conf test/robust/pipefail-middle.txt ; then exit 1; fi
     if ./tikl -v -c tikl.conf test/robust/pipefail-middle.txt 2>&1 | grep -F "SHOULD_NOT_RUN_PIPEFAIL" >/dev/null; then exit 1; fi
 fi
