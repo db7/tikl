@@ -312,6 +312,43 @@ skip_dot_slash(const char *p)
         return p + 2;
     return p;
 }
+static bool
+relativize_to_cwd(const char *abs_path, char *out, size_t cap)
+{
+    if (!abs_path || abs_path[0] != '/')
+        return false;
+    char cwd[PATH_MAX];
+    if (!getcwd(cwd, sizeof(cwd)))
+        return false;
+    size_t cwd_len = strlen(cwd);
+    while (cwd_len > 1 && cwd[cwd_len - 1] == '/')
+        cwd_len--;
+    if (strncmp(abs_path, cwd, cwd_len) != 0)
+        return false;
+    const char *rest = abs_path + cwd_len;
+    if (*rest == '/')
+        rest++;
+    if (*rest == '\0')
+        return false;
+    copy_str(out, cap, rest, "relative test path");
+    return true;
+}
+static const char *
+pick_test_path(const char *path, const char *path_abs,
+               char *out, size_t out_cap,
+               char *dir_out, size_t dir_cap)
+{
+    if (!relativize_to_cwd(path_abs, out, out_cap)) {
+        copy_str(out, out_cap, path, "test path");
+        const char *trimmed = skip_dot_slash(out);
+        if (trimmed != out) {
+            size_t len = strlen(trimmed);
+            memmove(out, trimmed, len + 1);
+        }
+    }
+    path_dirname(out, dir_out, dir_cap);
+    return out;
+}
 static void
 map_source_to_bin(const char *src, char *out, size_t cap)
 {
@@ -401,11 +438,13 @@ perform_substitutions(const char *cmd_in, mapkv *subs,
                       const char *testpath,
                       const char *testpath_abs)
 {
+    char s_path[PATH_MAX];
     char s_dir[PATH_MAX];
-    const char *path_for_dir = testpath_abs ? testpath_abs : testpath;
-    path_dirname(path_for_dir, s_dir, sizeof(s_dir));
+    const char *path_for_s = pick_test_path(testpath, testpath_abs,
+                                            s_path, sizeof(s_path),
+                                            s_dir, sizeof(s_dir));
     char bmap[PATH_MAX];
-    map_source_to_bin(testpath, bmap, sizeof(bmap));
+    map_source_to_bin(path_for_s, bmap, sizeof(bmap));
     char bdir[PATH_MAX];
     path_dirname(bmap, bdir, sizeof(bdir));
     ensure_dir(bdir);
@@ -446,7 +485,6 @@ perform_substitutions(const char *cmd_in, mapkv *subs,
     const char *scratch_for_T = tdir ? tdir : ((scratch_root &&
                                                 *scratch_root) ? scratch_root :
                                                default_scratch_root);
-    const char *path_for_s = testpath_abs ? testpath_abs : testpath;
 
     builtin_substs builtins = {
         .s = path_for_s,
@@ -515,12 +553,13 @@ static char *
 build_check_subs_blob(mapkv *subs, const char *testpath,
                       const char *testpath_abs)
 {
-    const char *path_for_s = (testpath_abs &&
-                              *testpath_abs) ? testpath_abs : testpath;
+    char s_path[PATH_MAX];
     char s_dir[PATH_MAX];
-    path_dirname(path_for_s, s_dir, sizeof(s_dir));
+    const char *path_for_s = pick_test_path(testpath, testpath_abs,
+                                            s_path, sizeof(s_path),
+                                            s_dir, sizeof(s_dir));
     char bmap[PATH_MAX];
-    map_source_to_bin(testpath, bmap, sizeof(bmap));
+    map_source_to_bin(path_for_s, bmap, sizeof(bmap));
     char bdir[PATH_MAX];
     path_dirname(bmap, bdir, sizeof(bdir));
     ensure_dir(bdir);

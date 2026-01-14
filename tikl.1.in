@@ -103,10 +103,10 @@ succeeds, the run is flagged as \[lq]XPASS\[rq] and fails overall. An optional
 Substitutions available inside \fBRUN:\fR commands:
 .TP
 \fB%s\fR
-Current test file path.
+Current test file path, relative to the working directory.
 .TP
 \fB%S\fR
-Directory containing the current test.
+Directory containing the current test (relative to the working directory).
 .TP
 \fB%t\fR
 Per-command scratch file (unique for the run).
@@ -132,6 +132,9 @@ line, \fBCHECK-EMPTY:\fR demands a blank line, \fBCHECK-NOT:\fR forbids the
 fragment anywhere, and \fBCHECK-COUNT:\fR enforces an exact occurrence count.
 Regex fragments can be embedded inline with \fB{{...}}\fR; surrounding text is
 still matched literally.
+.PP
+The bundled \fItikl.conf\fR also provides \fB%a\fR as \fB%(realpath %s)\fR for
+callers that still need an absolute test path.
 Inline helper expressions \fB%(basename ARG [SUFFIX])\fR / \fB%(dirname ARG)\fR
 / \fB%(realpath ARG)\fR expand anywhere tikl performs substitutions: inside
 \fBRUN:\fR commands, config values, and \fBCHECK\fR directives. Pass \fB-L\fR to

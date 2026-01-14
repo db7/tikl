@@ -129,8 +129,8 @@ project. Add `--print-output-on-fail` (`-x`) to `%check` when you want
 
 | Placeholder | Expands to                               |
 |-------------|------------------------------------------|
-| `%s`        | Absolute path to the current test file   |
-| `%S`        | Absolute directory containing the test   |
+| `%s`        | Path to the current test file (relative to cwd) |
+| `%S`        | Directory containing the test (relative to cwd) |
 | `%t`        | Scratch file path unique to this command |
 | `%T`        | Scratch directory                        |
 | `%b`        | Path in `bin/` mirroring the source name |
@@ -138,8 +138,10 @@ project. Add `--print-output-on-fail` (`-x`) to `%check` when you want
 
 `%check` maps to `tikl-check %s` out of the box. Additional placeholders come
 from `key = value` pairs in the config file. For example, `cc = cc -O2 -g` in
-`tikl.conf` makes `%cc` available inside `RUN:` lines. Use `-b DIR` if you
-need `%b` to land somewhere other than `bin/`.
+`tikl.conf` makes `%cc` available inside `RUN:` lines. The bundled
+`tikl.conf` also defines `%a` as `%(realpath %s)` for cases that need an
+absolute path. Use `-b DIR` if you need `%b` to land somewhere other than
+`bin/`.
 
 ### Handling flakes and expected failures
 

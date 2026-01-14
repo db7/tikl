@@ -1,2 +1,6 @@
-# RUN: printf 'PATH=%s\n' "%s" | %check
-# CHECK: PATH=/
+# RUN: printf 'REL=%s\nABS=%a\nABS2=%(realpath %s)\nDIR=%S\nDIRABS=%(realpath %S)\n' | %check
+# CHECK: REL=test/subst-abs.txt
+# CHECK: ABS=%a
+# CHECK: ABS2=%(realpath %s)
+# CHECK: DIR=%S
+# CHECK: DIRABS=%(realpath %S)

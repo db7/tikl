@@ -1,3 +1,4 @@
-# RUN: { echo "file = $(basename %s)"; echo "dir = %S"; } | %check
+# RUN: { echo "file = $(basename %s)"; echo "dir = %S"; echo "dirabs = %(realpath %S)"; } | %check
 # CHECK: file = %(basename %s)
-# CHECK: dir = %(realpath %S)
+# CHECK: dir = %S
+# CHECK: dirabs = %(realpath %S)
