@@ -485,6 +485,15 @@ parse_config(const char *path, mapkv *subs, vecstr *config_args)
                     tok = strtok(NULL, " \t");
                     continue;
                 }
+                if (strcmp(tok, "-D") == 0) {
+                    char *val = strtok(NULL, " \t");
+                    if (val && *val) {
+                        vecstr_push(config_args, tok);
+                        vecstr_push(config_args, val);
+                    }
+                    tok = strtok(NULL, " \t");
+                    continue;
+                }
                 vecstr_push(config_args, tok);
                 tok = strtok(NULL, " \t");
             }
@@ -1305,7 +1314,8 @@ main(int argc, char **argv)
                 cfgpath = optarg;
                 break;
             case 'D':
-                vecstr_push(&features, optarg);
+                if (optarg && *optarg)
+                    vecstr_push(&features, optarg);
                 break;
             case 't': {
                     errno = 0;

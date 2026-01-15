@@ -10,6 +10,8 @@ mkdir -p bin
 ./tikl -q -c tikl.conf test/check-prefix.c
 ./tikl -q -c tikl.conf test/check-prefix-multi.c
 ./tikl -q -c tikl.conf test/multi-run.c
+./tikl -q -D "" -c tikl.conf test/basic.c
+./tikl -q -c test/config-empty-feature.conf test/basic.c
 ./tikl -q -c tikl.conf test/subst-abs.txt
 ./tikl -q -c tikl.conf test/check-subst.c
 ./tikl -q -c tikl.conf test/check-functions.txt
