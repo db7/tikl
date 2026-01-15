@@ -1366,6 +1366,21 @@ main(int argc, char **argv)
     if (quiet && verbosity > 0)
         quiet = false;
 
+    if (verbosity >= 2) {
+        const char *cfg = cfgpath ? cfgpath : "(none)";
+        const char *src_root = source_root ? source_root : "(none)";
+        const char *bin_root_print = bin_root ? bin_root : "(default)";
+        const char *scratch = scratch_root ? scratch_root : default_scratch_root;
+        fprintf(stderr, "[opts] -c=%s -b=%s -s=%s -T=%s -t=%u -j=%u -L=%s\n",
+                cfg, bin_root_print, src_root, scratch, timeout_secs, jobs,
+                lit_compat ? "on" : "off");
+        fputs("[features]", stderr);
+        for (size_t i = 0; i < features.n; i++) {
+            fprintf(stderr, " %s", features.v[i]);
+        }
+        fputc('\n', stderr);
+    }
+
     if (optind >= parc) {
         usage(pargv[0]);
         vecstr_free(&config_args);
