@@ -21,6 +21,8 @@ set -eu
 ./tikl -q -c tikl.conf test/robust/unsupported.c | grep -E "SKIP|skip|Skip" >/dev/null 2>&1 || true
 ./tikl -q -c tikl.conf test/robust/failing.c
 ./tikl -q -c tikl.conf test/robust/assert-fail.c
+./tikl -q -c tikl.conf test/robust/estimated-sigabrt.c
+./tikl -q -c tikl.conf test/robust/parallel/driver.txt
 if ./tikl -q -c tikl.conf test/robust/check-mismatch.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/check-not-hit.c ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/check-next-fail.c ; then exit 1; fi

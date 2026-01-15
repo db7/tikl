@@ -724,6 +724,13 @@ init_run_shell(void)
 {
     run_shell_path = "/bin/sh";
     run_shell_has_pipefail = false;
+    const char *forced_shell = getenv("TIKL_SHELL");
+    if (forced_shell && *forced_shell) {
+        run_shell_path = forced_shell;
+        if (!lit_compat)
+            run_shell_has_pipefail = probe_pipefail(forced_shell);
+        return;
+    }
     if (lit_compat)
         return;
     if (probe_pipefail("/bin/sh")) {
@@ -1097,7 +1104,7 @@ usage(const char *arg0)
 {
     fprintf(stderr,
             "Usage: %s [-v|-q] [-c config] [-D feature]... [-t seconds] "
-            "[-T scratch] [-b binroot] [-L] FILE...\n"
+            "[-T scratch] [-b binroot] [-j jobs] [-L] FILE...\n"
             "  -v           verbose shell commands\n"
             "  -q           quiet (only pass/fail)\n"
             "  -c FILE      substitution config (lines: key = value)\n"
@@ -1105,6 +1112,7 @@ usage(const char *arg0)
             "  -t SECONDS   timeout for each RUN command (0 disables)\n"
             "  -T DIR       scratch directory root for %%t/%%T (default /tmp)\n"
             "  -b DIR       base directory used when expanding %%b/%%B (default bin)\n"
+            "  -j JOBS      run up to JOBS workers in parallel\n"
             "  -L           force lit-compatible behaviour (disable tikl extras)\n"
             "  -V           print tikl version and exit\n", arg0);
 }
@@ -1115,9 +1123,10 @@ main(int argc, char **argv)
     bool verbose = false, quiet = false;
     const char *cfgpath = NULL;
     vecstr features = {0};
+    unsigned jobs = 1;
 
     int opt;
-    while ((opt = getopt(argc, argv, "vqc:D:t:T:b:VL")) != -1) {
+    while ((opt = getopt(argc, argv, "vqc:D:t:T:b:j:VL")) != -1) {
         switch (opt) {
             case 'v':
                 verbose = true;
@@ -1148,6 +1157,17 @@ main(int argc, char **argv)
             case 'b':
                 bin_root = (optarg && *optarg) ? optarg : default_bin_root;
                 break;
+            case 'j': {
+                    errno = 0;
+                    char *end = NULL;
+                    unsigned long v = strtoul(optarg, &end, 10);
+                    if (errno || !end || *end != '\0' || v == 0)
+                        die("invalid jobs: %s", optarg);
+                    if (v > UINT_MAX)
+                        die("jobs too large: %s", optarg);
+                    jobs = (unsigned)v;
+                    break;
+                }
             case 'V':
                 printf("tikl %s\n", tikl_version);
                 vecstr_free(&features);
@@ -1177,10 +1197,60 @@ main(int argc, char **argv)
     init_run_shell();
 
     int overall_rc = 0;
-    for (int i = optind; i < argc; i++) {
-        int rc = run_test_file(argv[i], &subs, &features, verbose, quiet);
-        if (rc != 0)
-            overall_rc = rc;
+    int nfiles = argc - optind;
+    if (jobs <= 1 || nfiles <= 1) {
+        for (int i = optind; i < argc; i++) {
+            int rc = run_test_file(argv[i], &subs, &features, verbose, quiet);
+            if (rc != 0) {
+                overall_rc = rc;
+                break;
+            }
+        }
+    } else {
+        int next = optind;
+        unsigned active = 0;
+        bool fail_seen = false;
+        while ((next < argc && !fail_seen) || active > 0) {
+            while (active < jobs && next < argc && !fail_seen) {
+                pid_t pid = fork();
+                if (pid == 0) {
+                    char *worker_scratch = make_temp_dir();
+                    if (!worker_scratch)
+                        _exit(127);
+                    scratch_root = worker_scratch;
+                    int rc = run_test_file(argv[next], &subs, &features,
+                                           verbose, quiet);
+                    free(worker_scratch);
+                    _exit(rc);
+                } else if (pid > 0) {
+                    active++;
+                    next++;
+                } else {
+                    perror("fork");
+                    overall_rc = 127;
+                    break;
+                }
+            }
+            if (active == 0)
+                break;
+            int st = 0;
+            pid_t w = wait(&st);
+            if (w < 0) {
+                if (errno == EINTR)
+                    continue;
+                perror("wait");
+                overall_rc = 127;
+                break;
+            }
+            active--;
+            int rc = 1;
+            if (WIFEXITED(st))
+                rc = WEXITSTATUS(st);
+            if (rc != 0) {
+                overall_rc = rc;
+                fail_seen = true;
+            }
+        }
     }
 
     mapkv_free(&subs);

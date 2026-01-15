@@ -14,6 +14,8 @@ tikl \- tiny lit-inspired tester
 .I dir
 ] [\-b
 .I dir
+] [\-j
+.I jobs
 ] \fItest-file\fR ...
 .SH DESCRIPTION
 .B tikl
@@ -55,6 +57,12 @@ Use \fIdir\fR as the root for scratch files associated with the \fB%t\fR and
 .BI \-b " dir"
 Store paths produced for the \fB%b\fR/\fB%B\fR placeholders under \fIdir\fR
 instead of the default \fIbin\fR tree.
+.TP
+.BI \-j " jobs"
+Run up to \fIjobs\fR worker processes in parallel when multiple test files are
+supplied. Each worker forks a fresh tikl instance and uses its own scratch
+subdirectory (under the \fB-T\fR root) to avoid collisions. Defaults to 1
+sequential worker.
 .TP
 .B \-L
 Force FileCheck/lit-compatible behaviour in the helper. `%placeholder`

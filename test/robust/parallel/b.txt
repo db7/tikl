@@ -1,0 +1,2 @@
+// RUN: echo B-%T
+// CHECK: B-
