@@ -1,0 +1,1 @@
+// RUN: test -f %s

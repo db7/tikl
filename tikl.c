@@ -34,6 +34,8 @@ static const char *const default_bin_root = "bin";
 static const char *bin_root = "bin";
 static const char *const default_scratch_root = "/tmp";
 static const char *scratch_root = "/tmp";
+static const char *source_root = NULL;
+static char source_root_buf[PATH_MAX];
 static unsigned timeout_secs = 0;
 static const char tikl_version[] = TIKL_VERSION;
 static bool lit_compat = false;
@@ -360,19 +362,17 @@ skip_dot_slash(const char *p)
     return p;
 }
 static bool
-relativize_to_cwd(const char *abs_path, char *out, size_t cap)
+relativize_to_root(const char *abs_path, const char *root,
+                   char *out, size_t cap)
 {
-    if (!abs_path || abs_path[0] != '/')
+    if (!abs_path || abs_path[0] != '/' || !root || *root == '\0')
         return false;
-    char cwd[PATH_MAX];
-    if (!getcwd(cwd, sizeof(cwd)))
+    size_t root_len = strlen(root);
+    while (root_len > 1 && root[root_len - 1] == '/')
+        root_len--;
+    if (strncmp(abs_path, root, root_len) != 0)
         return false;
-    size_t cwd_len = strlen(cwd);
-    while (cwd_len > 1 && cwd[cwd_len - 1] == '/')
-        cwd_len--;
-    if (strncmp(abs_path, cwd, cwd_len) != 0)
-        return false;
-    const char *rest = abs_path + cwd_len;
+    const char *rest = abs_path + root_len;
     if (*rest == '/')
         rest++;
     if (*rest == '\0')
@@ -380,12 +380,24 @@ relativize_to_cwd(const char *abs_path, char *out, size_t cap)
     copy_str(out, cap, rest, "relative test path");
     return true;
 }
+static bool
+relativize_to_cwd(const char *abs_path, char *out, size_t cap)
+{
+    if (!abs_path || abs_path[0] != '/')
+        return false;
+    char cwd[PATH_MAX];
+    if (!getcwd(cwd, sizeof(cwd)))
+        return false;
+    return relativize_to_root(abs_path, cwd, out, cap);
+}
 static const char *
 pick_test_path(const char *path, const char *path_abs,
                char *out, size_t out_cap,
                char *dir_out, size_t dir_cap)
 {
-    if (!relativize_to_cwd(path_abs, out, out_cap)) {
+    if (source_root) {
+        copy_str(out, out_cap, path_abs, "test path");
+    } else if (!relativize_to_cwd(path_abs, out, out_cap)) {
         copy_str(out, out_cap, path, "test path");
         const char *trimmed = skip_dot_slash(out);
         if (trimmed != out) {
@@ -402,6 +414,17 @@ map_source_to_bin(const char *src, char *out, size_t cap)
     char noext[PATH_MAX];
     strip_ext(src, noext, sizeof(noext));
     const char *rel = skip_dot_slash(noext);
+    if (source_root && rel[0] == '/') {
+        size_t root_len = strlen(source_root);
+        if (strncmp(rel, source_root, root_len) == 0 &&
+            (rel[root_len] == '/' || rel[root_len] == '\0')) {
+            rel += root_len;
+            while (*rel == '/')
+                rel++;
+        }
+    }
+    while (*rel == '/')
+        rel++;
     const char *root = (bin_root && *bin_root) ? bin_root : default_bin_root;
     size_t nroot = strlen(root);
     bool need_slash = nroot && root[nroot - 1] != '/';
@@ -416,6 +439,24 @@ map_source_to_bin(const char *src, char *out, size_t cap)
     if (need_slash)
         *p++ = '/';
     memcpy(p, rel, nrel + 1);
+}
+
+static bool
+resolve_test_path(const char *path, char *abs_out, size_t cap)
+{
+    (void)cap;
+    if (realpath(path, abs_out))
+        return true;
+    if (source_root && path && *path != '/') {
+        char joined[PATH_MAX];
+        if (!build_temp_path(joined, sizeof(joined), source_root, path)) {
+            errno = ENAMETOOLONG;
+            return false;
+        }
+        if (realpath(joined, abs_out))
+            return true;
+    }
+    return false;
 }
 
 static void
@@ -936,19 +977,22 @@ static int
 run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
               int verbosity, bool quiet)
 {
-    FILE *f = fopen(path, "r");
-    if (!f) {
-        fprintf(stderr, "open %s: %s\n", path, strerror(errno));
-        return 2;
-    }
-
     char testpath_abs_buf[PATH_MAX];
-    if (!realpath(path, testpath_abs_buf)) {
-        fprintf(stderr, "realpath %s: %s\n", path, strerror(errno));
-        fclose(f);
+    if (!resolve_test_path(path, testpath_abs_buf, sizeof(testpath_abs_buf))) {
+        if (source_root && path && *path != '/') {
+            fprintf(stderr, "realpath %s (or %s/%s): %s\n", path, source_root,
+                    path, strerror(errno));
+        } else {
+            fprintf(stderr, "realpath %s: %s\n", path, strerror(errno));
+        }
         return 2;
     }
     const char *testpath_abs = testpath_abs_buf;
+    FILE *f = fopen(testpath_abs, "r");
+    if (!f) {
+        fprintf(stderr, "open %s: %s\n", testpath_abs, strerror(errno));
+        return 2;
+    }
     if (lit_compat) {
         unsetenv("TIKL_CHECK_SUBSTS");
     } else {
@@ -1189,7 +1233,7 @@ usage(const char *arg0)
 {
     fprintf(stderr,
             "Usage: %s [-v|-q] [-c config] [-D feature]... [-t seconds] "
-            "[-T scratch] [-b binroot] [-j jobs] [-L] FILE...\n"
+            "[-T scratch] [-b binroot] [-s srcroot] [-j jobs] [-L] FILE...\n"
             "  -v           verbose: print shell commands (repeat for command output)\n"
             "  -q           quiet (only pass/fail)\n"
             "  -c FILE      substitution config (lines: key = value)\n"
@@ -1197,6 +1241,7 @@ usage(const char *arg0)
             "  -t SECONDS   timeout for each RUN command (0 disables)\n"
             "  -T DIR       scratch directory root for %%t/%%T (default /tmp)\n"
             "  -b DIR       base directory used when expanding %%b/%%B (default bin)\n"
+            "  -s DIR       source tree root when invoking tikl from a build directory\n"
             "  -j JOBS      run up to JOBS workers in parallel\n"
             "  -L           force lit-compatible behaviour (disable tikl extras)\n"
             "  -V           print tikl version and exit\n", arg0);
@@ -1210,6 +1255,7 @@ main(int argc, char **argv)
     vecstr features = {0};
     vecstr config_args = {0};
     const char *cfgpath = NULL;
+    const char *source_root_arg = NULL;
     unsigned jobs = 1;
 
     /* pre-scan argv for -c to pick config before parsing options */
@@ -1246,7 +1292,7 @@ main(int argc, char **argv)
     int parc = (int)merged.n;
 
     optind = 1;
-    while ((opt = getopt(parc, pargv, "vqc:D:t:T:b:j:VL")) != -1) {
+    while ((opt = getopt(parc, pargv, "vqc:D:t:T:b:s:j:VL")) != -1) {
         switch (opt) {
             case 'v':
                 if (verbosity < 2)
@@ -1278,6 +1324,9 @@ main(int argc, char **argv)
             case 'b':
                 bin_root = (optarg && *optarg) ? optarg : default_bin_root;
                 break;
+            case 's':
+                source_root_arg = (optarg && *optarg) ? optarg : NULL;
+                break;
             case 'j': {
                     errno = 0;
                     char *end = NULL;
@@ -1307,6 +1356,12 @@ main(int argc, char **argv)
                 mapkv_free(&subs);
                 return 2;
         }
+    }
+    if (source_root_arg) {
+        if (!realpath(source_root_arg, source_root_buf)) {
+            die("realpath %s: %s", source_root_arg, strerror(errno));
+        }
+        source_root = source_root_buf;
     }
     if (quiet && verbosity > 0)
         quiet = false;

@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+mkdir -p bin
+
 ./tikl -q -c tikl.conf test/basic.c
 ./tikl -q -c tikl.conf test/check-not.c
 ./tikl -q -c tikl.conf test/check-advanced.c
@@ -45,4 +47,8 @@ if ./tikl -q -L -c tikl.conf test/check-subst.c ; then exit 1; fi
 if ./tikl -q -L -c tikl.conf test/check-functions.txt ; then exit 1; fi
 if ./tikl -q -c tikl.conf test/robust/empty.txt ; then exit 1; fi
 ./tikl -q -c tikl.conf test/robust/long-continue.txt
+(
+    cd bin
+    ../tikl -q -b . -s .. test/source-root-basic.txt
+)
 echo "integration: OK"

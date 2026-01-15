@@ -14,6 +14,8 @@ tikl \- tiny lit-inspired tester
 .I dir
 ] [\-b
 .I dir
+] [\-s
+.I dir
 ] [\-j
 .I jobs
 ] \fItest-file\fR ...
@@ -58,6 +60,17 @@ Use \fIdir\fR as the root for scratch files associated with the \fB%t\fR and
 .BI \-b " dir"
 Store paths produced for the \fB%b\fR/\fB%B\fR placeholders under \fIdir\fR
 instead of the default \fIbin\fR tree.
+.TP
+.BI \-s " dir"
+Look for test source files under \fIdir\fR rather than the current working
+directory, which makes it easier to invoke tikl from an out-of-tree build or
+binary directory.
+.IP
+\fB-s\fR is resolved to an absolute path. \fB-b\fR is used as supplied, so pass
+an absolute path if you want stable \fB%b\fR/\fB%B\fR. Example with sources in
+\fI/a/src\fR, binaries in \fI/b/bin\fR, and working directory \fI/c\fR:
+\fBtikl -s /a/src -b /b/bin x/test.c\fR yields \fB%s=/a/src/x/test.c\fR,
+\fB%S=/a/src/x\fR, \fB%b=/b/bin/x/test\fR, and \fB%B=/b/bin/x\fR.
 .TP
 .BI \-j " jobs"
 Run up to \fIjobs\fR worker processes in parallel when multiple test files are

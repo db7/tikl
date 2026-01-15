@@ -165,10 +165,18 @@ override any defaults supplied this way.
 
 - `-T DIR` — change the scratch directory root used for `%t`/`%T`.
 - `-b DIR` — change the root directory used for `%b`/`%B` (defaults to `bin`).
+- `-s DIR` — locate test sources under `DIR` so tikl can be invoked from a
+  separate build/bin directory.
 - `-L` — force lit-compatible behaviour (turn off non-standard tikl extensions).
 - `-t SECONDS` — terminate any `RUN` command that exceeds the given wall-clock
   budget (returns exit code 124).
 - `-V` — print the tikl version and exit.
+
+`-s DIR` is resolved to an absolute path. `-b DIR` is used as-is, so prefer an
+absolute path if you want `%b`/`%B` to stay stable regardless of your working
+directory. For example, with sources under `/a/src`, binaries in `/b/bin`, and a
+working directory of `/c`, run `tikl -s /a/src -b /b/bin x/test.c` to get
+`%s=/a/src/x/test.c`, `%S=/a/src/x`, `%b=/b/bin/x/test`, and `%B=/b/bin/x`.
 
 ## Fuzzing
 
