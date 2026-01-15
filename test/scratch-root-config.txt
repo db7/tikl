@@ -1,0 +1,3 @@
+// RUN: echo %T > %t
+// RUN: cat %t | %check
+// CHECK: bin/tmp-config

@@ -34,6 +34,7 @@ static const char *const default_bin_root = "bin";
 static const char *bin_root = "bin";
 static const char *const default_scratch_root = "/tmp";
 static const char *scratch_root = "/tmp";
+static bool scratch_root_forced = false;
 static const char *source_root = NULL;
 static char source_root_buf[PATH_MAX];
 static unsigned timeout_secs = 0;
@@ -1353,6 +1354,7 @@ main(int argc, char **argv)
                 }
             case 'T':
                 scratch_root = (optarg && *optarg) ? optarg : default_scratch_root;
+                scratch_root_forced = (optarg && *optarg);
                 break;
             case 'b':
                 bin_root = (optarg && *optarg) ? optarg : default_bin_root;
@@ -1454,10 +1456,13 @@ main(int argc, char **argv)
                 pid_t pid = fork();
                 if (pid == 0) {
                     setpgid(0, 0);
-                    char *worker_scratch = make_temp_dir();
-                    if (!worker_scratch)
-                        _exit(127);
-                    scratch_root = worker_scratch;
+                    char *worker_scratch = NULL;
+                    if (!scratch_root_forced) {
+                        worker_scratch = make_temp_dir();
+                        if (!worker_scratch)
+                            _exit(127);
+                        scratch_root = worker_scratch;
+                    }
                     int rc = run_test_file(pargv[next], &subs, &features,
                                            verbosity, quiet);
                     free(worker_scratch);
