@@ -83,6 +83,10 @@ example:
 .fi
 .PP
 This makes \fB%cc\fR and \fB%linker\fR available inside \fBRUN:\fR directives.
+Lines that begin with a hyphen are parsed as extra command-line flags (e.g.,
+\fB-D feature\fR or \fB-j 4\fR). Flags from the config file act as defaults;
+explicit command-line options override them, and both override the built-in
+defaults.
 .SH DIRECTIVES
 tikl recognises the following case-sensitive directives inside line comments:
 .TP

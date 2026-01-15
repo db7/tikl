@@ -372,7 +372,7 @@ map_source_to_bin(const char *src, char *out, size_t cap)
 }
 
 static void
-parse_config(const char *path, mapkv *subs)
+parse_config(const char *path, mapkv *subs, vecstr *config_args)
 {
     if (!path)
         return;
@@ -389,6 +389,19 @@ parse_config(const char *path, mapkv *subs)
         char *s = ltrim(line);
         if (*s == '\0' || *s == '#')
             continue;
+        if (*s == '-') {
+            char *tok = strtok(s, " \t");
+            while (tok) {
+                if (strcmp(tok, "-c") == 0) {
+                    tok = strtok(NULL, " \t");
+                    tok = strtok(NULL, " \t");
+                    continue;
+                }
+                vecstr_push(config_args, tok);
+                tok = strtok(NULL, " \t");
+            }
+            continue;
+        }
         char *eq = strchr(s, '=');
         if (!eq) {
             fprintf(stderr, "config %s:%lu: missing '='\n", path, (unsigned long)lno);
@@ -1121,12 +1134,46 @@ int
 main(int argc, char **argv)
 {
     bool verbose = false, quiet = false;
-    const char *cfgpath = NULL;
     vecstr features = {0};
+    vecstr config_args = {0};
+    const char *cfgpath = NULL;
     unsigned jobs = 1;
 
+    /* pre-scan argv for -c to pick config before parsing options */
+    for (int i = 1; i + 1 < argc; i++) {
+        if (strcmp(argv[i], "-c") == 0) {
+            cfgpath = argv[i + 1];
+            break;
+        }
+    }
+
     int opt;
-    while ((opt = getopt(argc, argv, "vqc:D:t:T:b:j:VL")) != -1) {
+    /* load placeholders default */
+    mapkv subs = {0};
+    mapkv_put(&subs, "check", "tikl-check %s");
+    vecstr_push(&features, "check");
+
+    if (cfgpath)
+        parse_config(cfgpath, &subs, &config_args);
+
+    /* merge config args before user args (excluding -c) */
+    vecstr merged = {0};
+    vecstr_push(&merged, argv[0]);
+    for (size_t i = 0; i < config_args.n; i++)
+        vecstr_push(&merged, config_args.v[i]);
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-c") == 0) {
+            i++;
+            continue;
+        }
+        vecstr_push(&merged, argv[i]);
+    }
+
+    char **pargv = merged.v;
+    int parc = (int)merged.n;
+
+    optind = 1;
+    while ((opt = getopt(parc, pargv, "vqc:D:t:T:b:j:VL")) != -1) {
         switch (opt) {
             case 'v':
                 verbose = true;
@@ -1171,36 +1218,40 @@ main(int argc, char **argv)
             case 'V':
                 printf("tikl %s\n", tikl_version);
                 vecstr_free(&features);
+                vecstr_free(&config_args);
+                vecstr_free(&merged);
+                mapkv_free(&subs);
                 return 0;
             case 'L':
                 lit_compat = true;
                 break;
             default:
-                usage(argv[0]);
+                usage(pargv[0]);
+                vecstr_free(&features);
+                vecstr_free(&config_args);
+                vecstr_free(&merged);
+                mapkv_free(&subs);
                 return 2;
         }
     }
     if (quiet && verbose)
         quiet = false;
 
-    if (optind >= argc) {
-        usage(argv[0]);
+    if (optind >= parc) {
+        usage(pargv[0]);
+        vecstr_free(&config_args);
+        vecstr_free(&merged);
+        mapkv_free(&subs);
         return 2;
     }
-
-    mapkv subs = {0};
-    mapkv_put(&subs, "check", "tikl-check %s");
-    vecstr_push(&features, "check");
-    if (cfgpath)
-        parse_config(cfgpath, &subs);
 
     init_run_shell();
 
     int overall_rc = 0;
-    int nfiles = argc - optind;
+    int nfiles = parc - optind;
     if (jobs <= 1 || nfiles <= 1) {
-        for (int i = optind; i < argc; i++) {
-            int rc = run_test_file(argv[i], &subs, &features, verbose, quiet);
+        for (int i = optind; i < parc; i++) {
+            int rc = run_test_file(pargv[i], &subs, &features, verbose, quiet);
             if (rc != 0) {
                 overall_rc = rc;
                 break;
@@ -1210,15 +1261,15 @@ main(int argc, char **argv)
         int next = optind;
         unsigned active = 0;
         bool fail_seen = false;
-        while ((next < argc && !fail_seen) || active > 0) {
-            while (active < jobs && next < argc && !fail_seen) {
+        while ((next < parc && !fail_seen) || active > 0) {
+            while (active < jobs && next < parc && !fail_seen) {
                 pid_t pid = fork();
                 if (pid == 0) {
                     char *worker_scratch = make_temp_dir();
                     if (!worker_scratch)
                         _exit(127);
                     scratch_root = worker_scratch;
-                    int rc = run_test_file(argv[next], &subs, &features,
+                    int rc = run_test_file(pargv[next], &subs, &features,
                                            verbose, quiet);
                     free(worker_scratch);
                     _exit(rc);
@@ -1255,5 +1306,7 @@ main(int argc, char **argv)
 
     mapkv_free(&subs);
     vecstr_free(&features);
+    vecstr_free(&config_args);
+    vecstr_free(&merged);
     return overall_rc;
 }
