@@ -143,6 +143,10 @@ from `key = value` pairs in the config file. For example, `cc = cc -O2 -g` in
 absolute path. Use `-b DIR` if you need `%b` to land somewhere other than
 `bin/`.
 
+By default tikl discards stdout/stderr from `RUN:` pipelines to keep logs
+compact. Use `-v` to echo the shell commands, or `-vv` to also stream their
+output.
+
 Lines beginning with `-` inside the config file are treated as default command
 line flags (for example, `-D feature` or `-j 4`). Explicit command-line options
 override any defaults supplied this way.

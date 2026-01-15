@@ -1,3 +1,3 @@
-// RUN: ./tikl -q -j2 -c tikl.conf test/robust/parallel/a.txt test/robust/parallel/b.txt | sort | %check
-// CHECK: A-
-// CHECK: B-
+// RUN: ./tikl -j2 -c tikl.conf test/robust/parallel/a.txt test/robust/parallel/b.txt 2>&1 | sort | %check
+// CHECK: [  OK ] test/robust/parallel/a.txt
+// CHECK: [  OK ] test/robust/parallel/b.txt

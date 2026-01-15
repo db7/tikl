@@ -33,7 +33,8 @@ timeout, and \fB[  OK ]\fR when a test succeeds.
 .SH OPTIONS
 .TP
 .B \-v
-Show each shell command before it runs.
+Show each shell command before it runs. Repeat (\fB-vv\fR) to also stream the
+command's stdout/stderr instead of discarding it.
 .TP
 .B \-q
 Quiet mode; only display failures and summary status.

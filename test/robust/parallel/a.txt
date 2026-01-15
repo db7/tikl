@@ -1,2 +1,2 @@
-// RUN: echo A-%T
+// RUN: echo A-%T | %check
 // CHECK: A-

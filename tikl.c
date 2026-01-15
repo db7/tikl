@@ -667,11 +667,11 @@ build_check_subs_blob(mapkv *subs, const char *testpath,
 }
 
 static int
-run_shell(const char *cmd, bool verbose, bool *timed_out)
+run_shell(const char *cmd, int verbosity, bool *timed_out)
 {
 #ifdef TIKL_FUZZ
     (void)cmd;
-    (void)verbose;
+    (void)verbosity;
     if (timed_out)
         *timed_out = false;
     return 0;
@@ -694,7 +694,7 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
         snprintf(wrapped, want, "%s%s", pipefail_prelude, cmd);
         script = wrapped;
     }
-    if (verbose) {
+    if (verbosity >= 1) {
         fputs("    $ ", stderr);
         fputs(cmd, stderr);
         fputc('\n', stderr);
@@ -706,6 +706,16 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
         return 127;
     }
     if (pid == 0) {
+        bool suppress_output = verbosity < 2 && strstr(script, "tikl-check") == NULL;
+        if (suppress_output) {
+            int devnull = open("/dev/null", O_RDWR);
+            if (devnull >= 0) {
+                dup2(devnull, STDOUT_FILENO);
+                dup2(devnull, STDERR_FILENO);
+                if (devnull > STDERR_FILENO)
+                    close(devnull);
+            }
+        }
         execl(run_shell_path, run_shell_path, "-c", script, (char*)0);
         _exit(127);
     }
@@ -924,7 +934,7 @@ parse_allow_retries(const char *line, unsigned *value)
 
 static int
 run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
-              bool verbose, bool quiet)
+              int verbosity, bool quiet)
 {
     FILE *f = fopen(path, "r");
     if (!f) {
@@ -1098,7 +1108,7 @@ run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
         unsigned used_attempts = 0;
         for (unsigned attempt = 0; attempt < attempts; attempt++) {
             bool this_timeout = false;
-            ec = run_shell(cmd, verbose, &this_timeout);
+            ec = run_shell(cmd, verbosity, &this_timeout);
             used_attempts = attempt + 1;
             timed_out = this_timeout;
             if (ec == 0) {
@@ -1180,7 +1190,7 @@ usage(const char *arg0)
     fprintf(stderr,
             "Usage: %s [-v|-q] [-c config] [-D feature]... [-t seconds] "
             "[-T scratch] [-b binroot] [-j jobs] [-L] FILE...\n"
-            "  -v           verbose shell commands\n"
+            "  -v           verbose: print shell commands (repeat for command output)\n"
             "  -q           quiet (only pass/fail)\n"
             "  -c FILE      substitution config (lines: key = value)\n"
             "  -D feature   enable feature for REQUIRES/UNSUPPORTED\n"
@@ -1195,7 +1205,8 @@ usage(const char *arg0)
 int
 main(int argc, char **argv)
 {
-    bool verbose = false, quiet = false;
+    int verbosity = 0;
+    bool quiet = false;
     vecstr features = {0};
     vecstr config_args = {0};
     const char *cfgpath = NULL;
@@ -1238,7 +1249,8 @@ main(int argc, char **argv)
     while ((opt = getopt(parc, pargv, "vqc:D:t:T:b:j:VL")) != -1) {
         switch (opt) {
             case 'v':
-                verbose = true;
+                if (verbosity < 2)
+                    verbosity++;
                 break;
             case 'q':
                 quiet = true;
@@ -1296,7 +1308,7 @@ main(int argc, char **argv)
                 return 2;
         }
     }
-    if (quiet && verbose)
+    if (quiet && verbosity > 0)
         quiet = false;
 
     if (optind >= parc) {
@@ -1320,7 +1332,7 @@ main(int argc, char **argv)
     int nfiles = parc - optind;
     if (jobs <= 1 || nfiles <= 1) {
         for (int i = optind; i < parc; i++) {
-            int rc = run_test_file(pargv[i], &subs, &features, verbose, quiet);
+            int rc = run_test_file(pargv[i], &subs, &features, verbosity, quiet);
             if (rc != 0) {
                 overall_rc = rc;
                 break;
@@ -1344,7 +1356,7 @@ main(int argc, char **argv)
                         _exit(127);
                     scratch_root = worker_scratch;
                     int rc = run_test_file(pargv[next], &subs, &features,
-                                           verbose, quiet);
+                                           verbosity, quiet);
                     free(worker_scratch);
                     _exit(rc);
                 } else if (pid > 0) {
