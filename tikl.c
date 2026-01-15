@@ -39,6 +39,12 @@ static const char tikl_version[] = TIKL_VERSION;
 static bool lit_compat = false;
 static const char *run_shell_path = "/bin/sh";
 static bool run_shell_has_pipefail = false;
+typedef struct {
+    pid_t *v;
+    size_t n, cap;
+} vecpid;
+static vecpid worker_pids = {0};
+static volatile sig_atomic_t abort_requested = 0;
 
 static void
 die(const char *fmt, ...)
@@ -134,6 +140,47 @@ vecstr_free(vecstr *vv)
     for (size_t i = 0; i < vv->n; i++)
         free(vv->v[i]);
     free(vv->v);
+}
+static void
+vecpid_push(vecpid *vp, pid_t p)
+{
+    if (vp->n == vp->cap) {
+        vp->cap = vp->cap ? vp->cap * 2 : 8;
+        vp->v = xrealloc(vp->v, vp->cap * sizeof(*vp->v));
+    }
+    vp->v[vp->n++] = p;
+}
+static void
+vecpid_remove(vecpid *vp, pid_t p)
+{
+    for (size_t i = 0; i < vp->n; i++) {
+        if (vp->v[i] == p) {
+            vp->v[i] = vp->v[vp->n - 1];
+            vp->n--;
+            return;
+        }
+    }
+}
+static void
+vecpid_free(vecpid *vp)
+{
+    free(vp->v);
+    vp->v = NULL;
+    vp->n = vp->cap = 0;
+}
+static void
+kill_active_workers(int sig)
+{
+    for (size_t i = 0; i < worker_pids.n; i++) {
+        pid_t p = worker_pids.v[i];
+        if (p > 0)
+            kill(-p, sig);
+    }
+}
+static void
+handle_sig(int sig)
+{
+    abort_requested = sig;
 }
 
 static void
@@ -629,6 +676,11 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
         *timed_out = false;
     return 0;
 #else
+    if (abort_requested) {
+        if (timed_out)
+            *timed_out = false;
+        return 128 + abort_requested;
+    }
     if (timed_out)
         *timed_out = false;
     const char *script = cmd;
@@ -661,8 +713,12 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
 
     if (timeout_secs == 0) {
         while (waitpid(pid, &st, 0) < 0) {
-            if (errno == EINTR)
+            if (errno == EINTR) {
+                if (abort_requested) {
+                    kill(pid, SIGTERM);
+                }
                 continue;
+            }
             perror("waitpid");
             free(wrapped);
             return 127;
@@ -674,8 +730,11 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
             if (r == pid)
                 break;
             if (r < 0) {
-                if (errno == EINTR)
+                if (errno == EINTR) {
+                    if (abort_requested)
+                        kill(pid, SIGTERM);
                     continue;
+                }
                 perror("waitpid");
                 free(wrapped);
                 return 127;
@@ -695,6 +754,9 @@ run_shell(const char *cmd, bool verbose, bool *timed_out)
             sleep(1);
             if (remaining > 0)
                 remaining--;
+            if (abort_requested) {
+                kill(pid, SIGTERM);
+            }
         }
     }
     if (WIFEXITED(st))
@@ -1245,6 +1307,13 @@ main(int argc, char **argv)
         return 2;
     }
 
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handle_sig;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+
     init_run_shell();
 
     int overall_rc = 0;
@@ -1262,9 +1331,14 @@ main(int argc, char **argv)
         unsigned active = 0;
         bool fail_seen = false;
         while ((next < parc && !fail_seen) || active > 0) {
+            if (abort_requested) {
+                fail_seen = true;
+                kill_active_workers(SIGTERM);
+            }
             while (active < jobs && next < parc && !fail_seen) {
                 pid_t pid = fork();
                 if (pid == 0) {
+                    setpgid(0, 0);
                     char *worker_scratch = make_temp_dir();
                     if (!worker_scratch)
                         _exit(127);
@@ -1276,6 +1350,7 @@ main(int argc, char **argv)
                 } else if (pid > 0) {
                     active++;
                     next++;
+                    vecpid_push(&worker_pids, pid);
                 } else {
                     perror("fork");
                     overall_rc = 127;
@@ -1293,6 +1368,7 @@ main(int argc, char **argv)
                 overall_rc = 127;
                 break;
             }
+            vecpid_remove(&worker_pids, w);
             active--;
             int rc = 1;
             if (WIFEXITED(st))
@@ -1300,6 +1376,7 @@ main(int argc, char **argv)
             if (rc != 0) {
                 overall_rc = rc;
                 fail_seen = true;
+                kill_active_workers(SIGTERM);
             }
         }
     }
@@ -1308,5 +1385,8 @@ main(int argc, char **argv)
     vecstr_free(&features);
     vecstr_free(&config_args);
     vecstr_free(&merged);
+    vecpid_free(&worker_pids);
+    if (abort_requested && overall_rc == 0)
+        overall_rc = 128 + abort_requested;
     return overall_rc;
 }
