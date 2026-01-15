@@ -1,0 +1,3 @@
+// RUN: echo one > %t
+// RUN: cat %t | %check
+// CHECK: one

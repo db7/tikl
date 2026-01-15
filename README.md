@@ -167,6 +167,8 @@ override any defaults supplied this way.
 - `-b DIR` — change the root directory used for `%b`/`%B` (defaults to `bin`).
 - `-s DIR` — locate test sources under `DIR` so tikl can be invoked from a
   separate build/bin directory.
+- `-T DIR` — used as-is for scratch paths (independent of `-b`/`-s`); use an
+  absolute path if you need it to be stable across working directories.
 - `-L` — force lit-compatible behaviour (turn off non-standard tikl extensions).
 - `-t SECONDS` — terminate any `RUN` command that exceeds the given wall-clock
   budget (returns exit code 124).

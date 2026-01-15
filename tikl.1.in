@@ -55,7 +55,9 @@ The wrapper exits with status 124 when a timeout occurs.
 .TP
 .BI \-T " dir"
 Use \fIdir\fR as the root for scratch files associated with the \fB%t\fR and
-\fB%T\fR placeholders. Defaults to \fI/tmp\fR.
+\fB%T\fR placeholders. Defaults to \fI/tmp\fR. The path is used as supplied
+and is independent of \fB-b\fR/\fB-s\fR; pass an absolute path to keep it
+stable regardless of working directory.
 .TP
 .BI \-b " dir"
 Store paths produced for the \fB%b\fR/\fB%B\fR placeholders under \fIdir\fR

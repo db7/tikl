@@ -333,6 +333,51 @@ make_temp_dir(void)
 }
 
 static void
+prepare_shared_scratch(char **tdir_out, char *tfile_out, size_t tfile_cap,
+                       const char **scratch_T_out)
+{
+    char *tdir = make_temp_dir();
+
+    char tfile[PATH_MAX];
+    int fd = -1;
+    const char *candidates[3];
+    size_t c = 0;
+    if (tdir)
+        candidates[c++] = tdir;
+    candidates[c++] = scratch_root;
+    candidates[c++] = default_scratch_root;
+    for (size_t i = 0; i < c; i++) {
+        if (!build_temp_path(tfile, sizeof(tfile), candidates[i],
+                             "out.XXXXXX"))
+            continue;
+        fd = mkstemp(tfile);
+        if (fd >= 0)
+            break;
+    }
+    if (fd >= 0)
+        close(fd);
+    if (fd < 0) {
+        if (build_temp_path(tfile, sizeof(tfile), default_scratch_root,
+                            "tikl-out.XXXXXX")) {
+            fd = mkstemp(tfile);
+            if (fd >= 0)
+                close(fd);
+        } else {
+            snprintf(tfile, sizeof(tfile), "%s/tikl-out.XXXXXX", default_scratch_root);
+        }
+    }
+    copy_str(tfile_out, tfile_cap, tfile, "scratch file path");
+
+    if (scratch_T_out)
+        *scratch_T_out = tdir ? tdir : ((scratch_root && *scratch_root) ? scratch_root :
+                                       default_scratch_root);
+    if (tdir_out)
+        *tdir_out = tdir;
+    else
+        free(tdir);
+}
+
+static void
 path_dirname(const char *path, char *out, size_t cap)
 {
     const char *slash = strrchr(path, '/');
@@ -546,7 +591,9 @@ apply_config_substitutions(const char *input, mapkv *subs)
 static char *
 perform_substitutions(const char *cmd_in, mapkv *subs,
                       const char *testpath,
-                      const char *testpath_abs)
+                      const char *testpath_abs,
+                      const char *shared_tfile,
+                      const char *shared_T)
 {
     char s_path[PATH_MAX];
     char s_dir[PATH_MAX];
@@ -559,47 +606,16 @@ perform_substitutions(const char *cmd_in, mapkv *subs,
     path_dirname(bmap, bdir, sizeof(bdir));
     ensure_dir(bdir);
 
-    char *tdir = make_temp_dir();
-
-    char tfile[PATH_MAX];
-    int fd = -1;
-    const char *candidates[3];
-    size_t c = 0;
-    if (tdir)
-        candidates[c++] = tdir;
-    candidates[c++] = scratch_root;
-    candidates[c++] = default_scratch_root;
-    for (size_t i = 0; i < c; i++) {
-        if (!build_temp_path(tfile, sizeof(tfile), candidates[i],
-                             "out.XXXXXX"))
-            continue;
-        fd = mkstemp(tfile);
-        if (fd >= 0)
-            break;
-    }
-    if (fd >= 0)
-        close(fd);
-    if (fd < 0) {
-        if (build_temp_path(tfile, sizeof(tfile), default_scratch_root,
-                            "tikl-out.XXXXXX")) {
-            fd = mkstemp(tfile);
-            if (fd >= 0)
-                close(fd);
-        } else {
-            snprintf(tfile, sizeof(tfile), "%s/tikl-out.XXXXXX", default_scratch_root);
-        }
-    }
-
     char *cmd = apply_config_substitutions(cmd_in, subs);
 
-    const char *scratch_for_T = tdir ? tdir : ((scratch_root &&
-                                                *scratch_root) ? scratch_root :
-                                               default_scratch_root);
+    const char *scratch_for_T = shared_T ? shared_T : ((scratch_root &&
+                                                        *scratch_root) ? scratch_root :
+                                                       default_scratch_root);
 
     builtin_substs builtins = {
         .s = path_for_s,
         .S = s_dir,
-        .t = tfile,
+        .t = shared_tfile,
         .T = scratch_for_T,
         .b = bmap,
         .B = bdir,
@@ -610,7 +626,6 @@ perform_substitutions(const char *cmd_in, mapkv *subs,
                                               lookup_builtin_cb, &builtins,
                                               "tikl", &status);
     free(cmd);
-    free(tdir);
     if (status != 0) {
         free(expanded);
         die("invalid placeholder expansion");
@@ -1148,10 +1163,17 @@ run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
         return xfail ? 0 : 1;
     }
 
+    char *shared_tdir = NULL;
+    char shared_tfile[PATH_MAX];
+    const char *shared_scratch_T = NULL;
+    prepare_shared_scratch(&shared_tdir, shared_tfile, sizeof(shared_tfile),
+                           &shared_scratch_T);
+
     int rc = 0;
     bool xfail_hit = false;
     for (size_t i = 0; i < runs.n; i++) {
-        char *cmd = perform_substitutions(runs.v[i], cfgsubs, path, testpath_abs);
+        char *cmd = perform_substitutions(runs.v[i], cfgsubs, path, testpath_abs,
+                                          shared_tfile, shared_scratch_T);
         unsigned attempts = have_allow_retries ? (allow_retries + 1) : 1;
         if (attempts == 0)
             attempts = 1;
@@ -1212,6 +1234,7 @@ run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
         }
         free(cmd);
     }
+    free(shared_tdir);
     if (rc == 0) {
         if (xfail) {
             if (!xfail_hit) {
