@@ -54,7 +54,7 @@ The example above runs a single test under `test/`, relying on the built-in
 `tikl-check`. After `tikl` and `tikl-check` are installed on your `PATH`, you no
 longer need `-c tikl.conf`. For suites, point tikl at multiple files (or
 glob via your shell) and it will execute each test in sequence, reporting
-`[ RUN ]`, `[ SKIP ]`, `[FAIL]`, and `[  OK ]` statuses. Use `-q` for concise
+`[ RUN ]`, `[ SKIP ]`, `[ FAIL]`, and `[  OK ]` statuses. Use `-q` for concise
 output or `-v` to echo the shell commands as they run.
 
 ### `%check` in action
@@ -151,6 +151,11 @@ Lines beginning with `-` inside the config file are treated as default command
 line flags (for example, `-D feature` or `-j 4`). Explicit command-line options
 override any defaults supplied this way.
 
+You can also set `TIKL_OPTIONS` to inject default flags (whitespace-delimited;
+single/double quotes preserve spaces). These options apply after config defaults
+but are overridden by explicit command-line arguments. For example:
+`TIKL_OPTIONS="-vv -k" ./tikl test/basic.c`.
+
 ### Handling flakes and expected failures
 
 - `ALLOW_RETRIES: N` gives each `RUN:` step up to `N + 1` attempts. tikl reruns a
@@ -167,6 +172,7 @@ override any defaults supplied this way.
 - `-b DIR` — change the root directory used for `%b`/`%B` (defaults to `bin`).
 - `-s DIR` — locate test sources under `DIR` so tikl can be invoked from a
   separate build/bin directory.
+- `-k` — keep running after failures instead of stopping at the first failure.
 - `-T DIR` — used as-is for scratch paths (independent of `-b`/`-s`); use an
   absolute path if you need it to be stable across working directories.
 - `-L` — force lit-compatible behaviour (turn off non-standard tikl extensions).

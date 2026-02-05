@@ -564,6 +564,56 @@ parse_config(const char *path, mapkv *subs, vecstr *config_args)
     fclose(f);
 }
 
+static void
+parse_env_options(vecstr *out, const char *env)
+{
+    if (!env || !*env)
+        return;
+    char tok[8192];
+    size_t len = 0;
+    char quote = 0;
+    for (const char *p = env;; p++) {
+        char c = *p;
+        if (c == '\0') {
+            if (quote)
+                die("unterminated quote in TIKL_OPTIONS");
+            if (len) {
+                tok[len] = '\0';
+                vecstr_push(out, tok);
+            }
+            break;
+        }
+        if (quote == 0) {
+            if (isspace((unsigned char)c)) {
+                if (len) {
+                    tok[len] = '\0';
+                    vecstr_push(out, tok);
+                    len = 0;
+                }
+                continue;
+            }
+            if (c == '\'' || c == '"') {
+                quote = c;
+                continue;
+            }
+            if (c == '\\' && p[1] != '\0') {
+                c = *++p;
+            }
+        } else {
+            if (c == quote) {
+                quote = 0;
+                continue;
+            }
+            if (quote == '"' && c == '\\' && p[1] != '\0') {
+                c = *++p;
+            }
+        }
+        if (len + 1 >= sizeof(tok))
+            die("TIKL_OPTIONS token too long");
+        tok[len++] = c;
+    }
+}
+
 static char *
 apply_config_substitutions(const char *input, mapkv *subs)
 {
@@ -1216,10 +1266,10 @@ run_test_file(const char *path, mapkv *cfgsubs, vecstr *features,
                 } else {
                     const char *attempt_note = (used_attempts > 1) ? " after retries" : "";
                     if (timed_out) {
-                        fprintf(stderr, "[TIME] %s (step %zu exceeded %u s%s)\n", path,
+                        fprintf(stderr, "[ TIME] %s (step %zu exceeded %u s%s)\n", path,
                                 i + 1, timeout_secs, attempt_note);
                     } else {
-                        fprintf(stderr, "[FAIL] %s (step %zu exit %d%s)\n", path, i + 1,
+                        fprintf(stderr, "[ FAIL] %s (step %zu exit %d%s)\n", path, i + 1,
                                 ec, attempt_note);
                     }
                 }
@@ -1265,10 +1315,11 @@ static void
 usage(const char *arg0)
 {
     fprintf(stderr,
-            "Usage: %s [-v|-q] [-c config] [-D feature]... [-t seconds] "
+            "Usage: %s [-v|-q] [-k] [-c config] [-D feature]... [-t seconds] "
             "[-T scratch] [-b binroot] [-s srcroot] [-j jobs] [-L] FILE...\n"
             "  -v           verbose: print shell commands (repeat for command output)\n"
             "  -q           quiet (only pass/fail)\n"
+            "  -k           keep going after failures\n"
             "  -c FILE      substitution config (lines: key = value)\n"
             "  -D feature   enable feature for REQUIRES/UNSUPPORTED\n"
             "  -t SECONDS   timeout for each RUN command (0 disables)\n"
@@ -1285,17 +1336,29 @@ main(int argc, char **argv)
 {
     int verbosity = 0;
     bool quiet = false;
+    bool keep_going = false;
     vecstr features = {0};
     vecstr config_args = {0};
+    vecstr env_args = {0};
     const char *cfgpath = NULL;
     const char *source_root_arg = NULL;
     unsigned jobs = 1;
+
+    parse_env_options(&env_args, getenv("TIKL_OPTIONS"));
 
     /* pre-scan argv for -c to pick config before parsing options */
     for (int i = 1; i + 1 < argc; i++) {
         if (strcmp(argv[i], "-c") == 0) {
             cfgpath = argv[i + 1];
             break;
+        }
+    }
+    if (!cfgpath) {
+        for (size_t i = 0; i + 1 < env_args.n; i++) {
+            if (strcmp(env_args.v[i], "-c") == 0) {
+                cfgpath = env_args.v[i + 1];
+                break;
+            }
         }
     }
 
@@ -1313,6 +1376,8 @@ main(int argc, char **argv)
     vecstr_push(&merged, argv[0]);
     for (size_t i = 0; i < config_args.n; i++)
         vecstr_push(&merged, config_args.v[i]);
+    for (size_t i = 0; i < env_args.n; i++)
+        vecstr_push(&merged, env_args.v[i]);
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-c") == 0) {
             i++;
@@ -1325,7 +1390,7 @@ main(int argc, char **argv)
     int parc = (int)merged.n;
 
     optind = 1;
-    while ((opt = getopt(parc, pargv, "vqc:D:t:T:b:s:j:VL")) != -1) {
+    while ((opt = getopt(parc, pargv, "vqkc:D:t:T:b:s:j:VL")) != -1) {
         switch (opt) {
             case 'v':
                 if (verbosity < 2)
@@ -1333,6 +1398,9 @@ main(int argc, char **argv)
                 break;
             case 'q':
                 quiet = true;
+                break;
+            case 'k':
+                keep_going = true;
                 break;
             case 'c':
                 cfgpath = optarg;
@@ -1377,6 +1445,7 @@ main(int argc, char **argv)
                 printf("tikl %s\n", tikl_version);
                 vecstr_free(&features);
                 vecstr_free(&config_args);
+                vecstr_free(&env_args);
                 vecstr_free(&merged);
                 mapkv_free(&subs);
                 return 0;
@@ -1387,6 +1456,7 @@ main(int argc, char **argv)
                 usage(pargv[0]);
                 vecstr_free(&features);
                 vecstr_free(&config_args);
+                vecstr_free(&env_args);
                 vecstr_free(&merged);
                 mapkv_free(&subs);
                 return 2;
@@ -1419,6 +1489,7 @@ main(int argc, char **argv)
     if (optind >= parc) {
         usage(pargv[0]);
         vecstr_free(&config_args);
+        vecstr_free(&env_args);
         vecstr_free(&merged);
         mapkv_free(&subs);
         return 2;
@@ -1439,20 +1510,22 @@ main(int argc, char **argv)
         for (int i = optind; i < parc; i++) {
             int rc = run_test_file(pargv[i], &subs, &features, verbosity, quiet);
             if (rc != 0) {
-                overall_rc = rc;
-                break;
+                if (overall_rc == 0)
+                    overall_rc = rc;
+                if (!keep_going)
+                    break;
             }
         }
     } else {
         int next = optind;
         unsigned active = 0;
-        bool fail_seen = false;
-        while ((next < parc && !fail_seen) || active > 0) {
+        bool stop_scheduling = false;
+        while ((next < parc && !stop_scheduling) || active > 0) {
             if (abort_requested) {
-                fail_seen = true;
+                stop_scheduling = true;
                 kill_active_workers(SIGTERM);
             }
-            while (active < jobs && next < parc && !fail_seen) {
+            while (active < jobs && next < parc && !stop_scheduling) {
                 pid_t pid = fork();
                 if (pid == 0) {
                     setpgid(0, 0);
@@ -1494,9 +1567,12 @@ main(int argc, char **argv)
             if (WIFEXITED(st))
                 rc = WEXITSTATUS(st);
             if (rc != 0) {
-                overall_rc = rc;
-                fail_seen = true;
-                kill_active_workers(SIGTERM);
+                if (overall_rc == 0)
+                    overall_rc = rc;
+                if (!keep_going) {
+                    stop_scheduling = true;
+                    kill_active_workers(SIGTERM);
+                }
             }
         }
     }
@@ -1504,6 +1580,7 @@ main(int argc, char **argv)
     mapkv_free(&subs);
     vecstr_free(&features);
     vecstr_free(&config_args);
+    vecstr_free(&env_args);
     vecstr_free(&merged);
     vecpid_free(&worker_pids);
     if (abort_requested && overall_rc == 0)

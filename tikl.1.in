@@ -4,7 +4,7 @@
 tikl \- tiny lit-inspired tester
 .SH SYNOPSIS
 .B tikl
-[\-v |\-q] [\-c
+[\-v |\-q] [\-k] [\-c
 .I file
 ] [\-D
 .I feature
@@ -30,8 +30,8 @@ commands to execute and which feature gates should apply before running them.
 .PP
 By default the tool prints a compact status line for every test:
 \fB[ RUN ]\fR when starting, optionally \fB[ SKIP ]\fR when a feature gate
-excludes the test, \fB[FAIL]\fR when a command exits non-zero, \fB[TIME]\fR on a
-timeout, and \fB[  OK ]\fR when a test succeeds.
+excludes the test, \fB[ FAIL]\fR when a command exits non-zero, \fB[ TIME]\fR on a
+timeout, and \fB[ OK  ]\fR when a test succeeds.
 .SH OPTIONS
 .TP
 .B \-v
@@ -40,6 +40,9 @@ command's stdout/stderr instead of discarding it.
 .TP
 .B \-q
 Quiet mode; only display failures and summary status.
+.TP
+.B \-k
+Keep going after failures instead of stopping at the first failing test file.
 .TP
 .BI \-c " file"
 Read additional substitution keys from \fIfile\fR. Each line should be
@@ -103,6 +106,13 @@ Lines that begin with a hyphen are parsed as extra command-line flags (e.g.,
 \fB-D feature\fR or \fB-j 4\fR). Flags from the config file act as defaults;
 explicit command-line options override them, and both override the built-in
 defaults.
+.SH ENVIRONMENT
+.TP
+.B TIKL_OPTIONS
+Extra command-line flags parsed after configuration defaults but before the
+explicit command line. Tokens are split on whitespace; single or double quotes
+preserve spaces, and backslashes escape characters outside quotes and inside
+double quotes. Explicit command-line options override these defaults.
 .SH DIRECTIVES
 tikl recognises the following case-sensitive directives inside line comments:
 .TP
