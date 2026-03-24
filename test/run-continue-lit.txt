@@ -1,0 +1,3 @@
+# RUN: echo hello \
+# RUN:      world | %check
+# CHECK: hello world

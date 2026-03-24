@@ -75,6 +75,9 @@ int main(void) {
 }
 ```
 
+`RUN:` lines can also be continued with a trailing `\`. The next physical line
+may be plain text or another `RUN:` directive, matching lit-style formatting.
+
 ## `%check` and `CHECK:` helpers
 
 With the default `tikl.conf` in this repository, `%check` expands to

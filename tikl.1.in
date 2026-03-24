@@ -121,6 +121,8 @@ Collects the shell \fIcommand\fR to execute for the current test.
 Commands run under \fB/bin/sh -c\fR. In the default (non-\fB-L\fR) mode, tikl
 attempts to enable \fBpipefail\fR when the host shell supports it (falling back
 to \fB/bin/bash\fR when available), so a pipeline fails when any stage fails.
+A trailing backslash continues the command onto the next physical line, which
+may be plain text or another \fBRUN:\fR directive in lit-style form.
 .TP
 \fBREQUIRES:\fR feature[, feature...]
 Skips the test unless every listed feature is supplied with \fB-D\fR.
