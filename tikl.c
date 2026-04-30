@@ -822,6 +822,12 @@ run_shell(const char *cmd, int verbosity, bool *timed_out)
         return 127;
     }
     if (pid == 0) {
+        int devnull_in = open("/dev/null", O_RDONLY);
+        if (devnull_in >= 0) {
+            dup2(devnull_in, STDIN_FILENO);
+            if (devnull_in > STDERR_FILENO)
+                close(devnull_in);
+        }
         bool suppress_output = verbosity < 2 && strstr(script, "tikl-check") == NULL;
         if (suppress_output) {
             int devnull = open("/dev/null", O_RDWR);
