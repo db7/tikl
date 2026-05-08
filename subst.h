@@ -5,8 +5,8 @@
 #include <stddef.h>
 
 typedef const char *(*tikl_subst_lookup_fn)(void *userdata,
-                                            const char *key,
-                                            size_t len);
+        const char *key,
+        size_t len);
 
 char *tikl_expand_placeholders(const char *input,
                                bool allow_expansion,

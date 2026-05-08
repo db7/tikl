@@ -69,6 +69,80 @@ copy_str(char *dst, size_t cap, const char *src, const char *what)
     memcpy(dst, src, needed);
 }
 
+static bool
+resolve_program_path(const char *arg0, char *dst)
+{
+    if (!arg0 || !*arg0)
+        return false;
+
+    if (strchr(arg0, '/')) {
+        if (arg0[0] == '/') {
+            copy_str(dst, PATH_MAX, arg0, "program path");
+            return true;
+        }
+
+        char cwd[PATH_MAX];
+        if (!getcwd(cwd, sizeof(cwd)))
+            return false;
+        int n = snprintf(dst, PATH_MAX, "%s/%s", cwd, arg0);
+        return n > 0 && n < PATH_MAX;
+    }
+
+    const char *path = getenv("PATH");
+    if (!path)
+        return false;
+
+    const char *entry = path;
+    while (true) {
+        const char *colon = strchr(entry, ':');
+        size_t dir_len = colon ? (size_t)(colon - entry) : strlen(entry);
+        const char *dir = dir_len == 0 ? "." : entry;
+        size_t actual_len = dir_len == 0 ? 1 : dir_len;
+
+        char candidate[PATH_MAX];
+        int n = snprintf(candidate, sizeof(candidate), "%.*s/%s", (int)actual_len, dir,
+                         arg0);
+        if (n > 0 && (size_t)n < sizeof(candidate) && access(candidate, X_OK) == 0) {
+            copy_str(dst, PATH_MAX, candidate, "program path");
+            return true;
+        }
+
+        if (!colon)
+            break;
+        entry = colon + 1;
+    }
+
+    return false;
+}
+
+static void
+prepend_own_dir_to_path(const char *arg0)
+{
+    char resolved[PATH_MAX];
+    if (!resolve_program_path(arg0, resolved))
+        return;
+
+    char *slash = strrchr(resolved, '/');
+    if (!slash)
+        return;
+    *slash = '\0';
+
+    const char *oldpath = getenv("PATH");
+    if (!oldpath)
+        oldpath = "";
+
+    size_t dir_len = strlen(resolved);
+    size_t path_len = strlen(oldpath);
+    size_t needed = dir_len + 1 + path_len + 1;
+    char *path = malloc(needed);
+    if (!path)
+        die("OOM");
+    snprintf(path, needed, "%s:%s", resolved, oldpath);
+    if (setenv("PATH", path, 1) != 0)
+        die("setenv PATH: %s", strerror(errno));
+    free(path);
+}
+
 static void
 join_with_space(char *dst, size_t cap, const char *lhs,
                 const char *rhs, const char *what)
@@ -371,7 +445,7 @@ prepare_shared_scratch(char **tdir_out, char *tfile_out, size_t tfile_cap,
 
     if (scratch_T_out)
         *scratch_T_out = tdir ? tdir : ((scratch_root && *scratch_root) ? scratch_root :
-                                       default_scratch_root);
+                                        default_scratch_root);
     if (tdir_out)
         *tdir_out = tdir;
     else
@@ -660,8 +734,8 @@ perform_substitutions(const char *cmd_in, mapkv *subs,
     char *cmd = apply_config_substitutions(cmd_in, subs);
 
     const char *scratch_for_T = shared_T ? shared_T : ((scratch_root &&
-                                                        *scratch_root) ? scratch_root :
-                                                       default_scratch_root);
+                                *scratch_root) ? scratch_root :
+                                default_scratch_root);
 
     builtin_substs builtins = {
         .s = path_for_s,
@@ -674,8 +748,8 @@ perform_substitutions(const char *cmd_in, mapkv *subs,
 
     int status = 0;
     char *expanded = tikl_expand_placeholders(cmd, true, true,
-                                              lookup_builtin_cb, &builtins,
-                                              "tikl", &status);
+                     lookup_builtin_cb, &builtins,
+                     "tikl", &status);
     free(cmd);
     if (status != 0) {
         free(expanded);
@@ -1349,6 +1423,8 @@ main(int argc, char **argv)
     const char *cfgpath = NULL;
     const char *source_root_arg = NULL;
     unsigned jobs = 1;
+
+    prepend_own_dir_to_path(argv[0]);
 
     parse_env_options(&env_args, getenv("TIKL_OPTIONS"));
 

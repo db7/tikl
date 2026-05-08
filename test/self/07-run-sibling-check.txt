@@ -1,0 +1,1 @@
+# RUN: env PATH=/usr/bin:/bin %(realpath ./tikl) -q test/basic.c

@@ -436,8 +436,8 @@ parse_test_file(const char *path, const vecstr *prefixes,
             if ((rest = match_directive(line, prefixes->v[i], "-NEXT:"))) {
                 const char *pat = trim_leading(rest);
                 char *expanded = tikl_expand_placeholders(
-                    pat, !lit_compat, !lit_compat, lookup_subst_cb,
-                    (void *)subs, "tikl-check", status);
+                                     pat, !lit_compat, !lit_compat, lookup_subst_cb,
+                                     (void *)subs, "tikl-check", status);
                 matched = true;
                 if (!expanded)
                     continue;
@@ -446,8 +446,8 @@ parse_test_file(const char *path, const vecstr *prefixes,
             } else if ((rest = match_directive(line, prefixes->v[i], "-SAME:"))) {
                 const char *pat = trim_leading(rest);
                 char *expanded = tikl_expand_placeholders(
-                    pat, !lit_compat, !lit_compat, lookup_subst_cb,
-                    (void *)subs, "tikl-check", status);
+                                     pat, !lit_compat, !lit_compat, lookup_subst_cb,
+                                     (void *)subs, "tikl-check", status);
                 matched = true;
                 if (!expanded)
                     continue;
@@ -482,8 +482,8 @@ parse_test_file(const char *path, const vecstr *prefixes,
                 }
                 const char *pat = trim_leading(endptr);
                 char *expanded = tikl_expand_placeholders(
-                    pat, !lit_compat, !lit_compat, lookup_subst_cb,
-                    (void *)subs, "tikl-check", status);
+                                     pat, !lit_compat, !lit_compat, lookup_subst_cb,
+                                     (void *)subs, "tikl-check", status);
                 matched = true;
                 if (!expanded)
                     continue;
@@ -492,8 +492,8 @@ parse_test_file(const char *path, const vecstr *prefixes,
             } else if ((rest = match_directive(line, prefixes->v[i], "-NOT:"))) {
                 const char *pat = trim_leading(rest);
                 char *expanded = tikl_expand_placeholders(
-                    pat, !lit_compat, !lit_compat, lookup_subst_cb,
-                    (void *)subs, "tikl-check", status);
+                                     pat, !lit_compat, !lit_compat, lookup_subst_cb,
+                                     (void *)subs, "tikl-check", status);
                 matched = true;
                 if (!expanded)
                     continue;
@@ -502,8 +502,8 @@ parse_test_file(const char *path, const vecstr *prefixes,
             } else if ((rest = match_directive(line, prefixes->v[i], ":"))) {
                 const char *pat = trim_leading(rest);
                 char *expanded = tikl_expand_placeholders(
-                    pat, !lit_compat, !lit_compat, lookup_subst_cb,
-                    (void *)subs, "tikl-check", status);
+                                     pat, !lit_compat, !lit_compat, lookup_subst_cb,
+                                     (void *)subs, "tikl-check", status);
                 matched = true;
                 if (!expanded)
                     continue;

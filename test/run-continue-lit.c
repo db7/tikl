@@ -2,7 +2,8 @@
 // RUN:      world | %check
 // CHECK: hello world
 
-int main(void)
+int
+main(void)
 {
     return 0;
 }

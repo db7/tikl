@@ -89,7 +89,7 @@ skip_ws(const char **cursor)
     if (!cursor)
         return;
     const char *p = *cursor;
-    while (p && *p && isspace((unsigned char)*p))
+    while (p && *p && isspace((unsigned char) * p))
         p++;
     *cursor = p;
 }
@@ -108,7 +108,7 @@ parse_helper_token(const char *who, const char **cursor, bool *error)
     subst_strbuf sb = {0};
     char quote = '\0';
     while (*p) {
-        if (!quote && isspace((unsigned char)*p))
+        if (!quote && isspace((unsigned char) * p))
             break;
         if (!quote && (*p == '\'' || *p == '"')) {
             quote = *p++;
@@ -142,7 +142,8 @@ parse_helper_token(const char *who, const char **cursor, bool *error)
 }
 
 static char *
-run_builtin_function(const char *who, const char *name, const char *arg, int *status)
+run_builtin_function(const char *who, const char *name, const char *arg,
+                     int *status)
 {
     if (strcmp(name, "basename") == 0) {
         bool parse_error = false;
@@ -279,7 +280,7 @@ tikl_expand_placeholders(const char *input,
                 if (!expr)
                     subst_die(who);
                 char *cursor = expr;
-                while (*cursor && isspace((unsigned char)*cursor))
+                while (*cursor && isspace((unsigned char) * cursor))
                     cursor++;
                 if (*cursor == '\0') {
                     fprintf(stderr, "%s: empty %%( ) expression\n",
@@ -291,15 +292,15 @@ tikl_expand_placeholders(const char *input,
                     return NULL;
                 }
                 char *fname = cursor;
-                while (*cursor && !isspace((unsigned char)*cursor))
+                while (*cursor && !isspace((unsigned char) * cursor))
                     cursor++;
                 if (*cursor)
                     *cursor++ = '\0';
-                while (*cursor && isspace((unsigned char)*cursor))
+                while (*cursor && isspace((unsigned char) * cursor))
                     cursor++;
                 char *arg = cursor;
                 char *end = expr + inner_len;
-                while (end > arg && isspace((unsigned char)*(end - 1)))
+                while (end > arg && isspace((unsigned char) * (end - 1)))
                     end--;
                 *end = '\0';
                 if (*arg == '\0') {
